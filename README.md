@@ -70,6 +70,29 @@ The `example` ships a `MockLspServer` that returns canned JSON-RPC responses, so
 the round trip is demonstrable without a real server. Replace it with your WASM
 language server to get genuine language features.
 
+### Limitation: only synchronous, prompted replies are forwarded
+
+`lsp_message_handle` is request/response: each message from the editor is handed
+to the server, and the messages it *returns* are forwarded straight back. This
+covers requests (e.g. `initialize`, hover, completion) and notifications.
+
+It does **not** yet support **server-initiated, unprompted messages** -- a
+server pushing `textDocument/publishDiagnostics` (lint/error squiggles) some time
+*after* a processing step, rather than as the return value of handling a request.
+Supporting that needs an async path: a channel the server can push onto at any
+time, drained into `Cmd::LspMessageSend`. A sketch:
+
+* give `LspServer` a way to emit messages out-of-band (e.g. take a
+  `Callback<LspMessage>` / channel sender on construction, or add a `poll`
+  method), and
+* in `code_mirror.rs`, forward those emissions to the editor from the message
+  loop (alongside the existing `Evt::LspMessageRecv` handling) -- for example by
+  `select!`ing over both the eval channel and the server's outbound channel.
+
+Until then, diagnostics must be returned in response to a message the editor
+sends (e.g. piggy-backed on the reply to a `didChange`/`didOpen`-triggered
+request), not pushed spontaneously.
+
 ## Running the example
 
 ```sh

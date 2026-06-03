@@ -31,12 +31,16 @@ impl LspBridge {
     ///
     /// Call this from a component body (it allocates a [`Callback`] in the
     /// current scope).
+    /// Must be called unconditionally from a component body -- it uses
+    /// [`use_callback`] so the callback persists across re-renders (a plain
+    /// `Callback::new` would be invalidated on the next render and then fail
+    /// when the component's long-lived message loop calls it).
     pub fn lsp_bridge_from_server<S>(uri: impl Into<String>, mut server: Signal<S>) -> Self
     where
         S: LspServer + 'static,
     {
         let on_message_to_server =
-            Callback::new(move |message: LspMessage| server.write().lsp_message_handle(message));
+            use_callback(move |message: LspMessage| server.write().lsp_message_handle(message));
 
         Self {
             uri: uri.into(),

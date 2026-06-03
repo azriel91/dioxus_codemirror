@@ -23,13 +23,11 @@ fn main() {
 #[component]
 fn App() -> Element {
     let value_plain = use_signal(|| "Edit me -- plain text, fully editable.\n".to_string());
-    let value_yaml = use_signal(|| {
-        "name: example\nversion: 0.1.0\nitems:\n  - one\n  - two\n".to_string()
-    });
+    let value_yaml =
+        use_signal(|| "name: example\nversion: 0.1.0\nitems:\n  - one\n  - two\n".to_string());
     let value_markdown =
         use_signal(|| "# Title\n\nSome **bold** and _italic_ text.\n\n- a\n- b\n".to_string());
-    let mut value_lsp =
-        use_signal(|| "fn main() {\n    println!(\"hello\");\n}\n".to_string());
+    let mut value_lsp = use_signal(|| "fn main() {\n    println!(\"hello\");\n}\n".to_string());
 
     // The in-page mock language server. Its replies are returned synchronously
     // and forwarded straight back to the editor's LSP client.
