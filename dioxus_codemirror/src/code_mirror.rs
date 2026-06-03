@@ -62,21 +62,18 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
         format!("cm-editor-{}", EDITOR_ID_NEXT.fetch_add(1, Ordering::Relaxed))
     });
 
-    // The glue script's evaluator handle, shared with the effects below once
+    // The glue script's evaluator handle, shared with the doc-set effect once
     // the editor is created.
     let mut eval_handle = use_signal(|| None::<Eval>);
     // Last document text synced with the editor. Used to break the
     // edit -> signal -> doc_set -> edit echo loop on the Rust side.
     let mut doc_synced = use_signal(String::new);
-    // Count of `messages_to_client` entries already forwarded to the editor.
-    let mut lsp_forwarded = use_signal(|| 0_usize);
 
     // === Create the editor and pump JS events (Evt) into Rust === //
     let mount_id_future = mount_id.clone();
-    let lsp_future = lsp.clone();
     use_future(move || {
         let mount_id = mount_id_future.clone();
-        let lsp = lsp_future.clone();
+        let lsp = lsp.clone();
         async move {
             let mut evaluator = eval(include_str!("code_mirror/glue.js"));
 
@@ -108,8 +105,15 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                         value.set(doc);
                     }
                     Ok(Evt::LspMessageRecv { json }) => {
+                        // Hand the message to the server and forward its replies
+                        // straight back to the editor's LSP client.
                         if let Some(lsp) = lsp.as_ref() {
-                            lsp.on_message_to_server.call(LspMessage::new(json));
+                            let replies = lsp.on_message_to_server.call(LspMessage::new(json));
+                            for reply in replies {
+                                let _ = evaluator.send(Cmd::LspMessageSend {
+                                    json: reply.json_into(),
+                                });
+                            }
                         }
                     }
                     // Channel closed (component unmounted) or a decode error.
@@ -131,25 +135,6 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                 .is_ok()
         {
             doc_synced.set(value_current);
-        }
-    });
-
-    // === Forward server -> client LSP messages into the editor === //
-    use_effect(move || {
-        let Some(lsp) = lsp.as_ref() else {
-            return;
-        };
-        let messages = lsp.messages_to_client.read();
-        let forwarded = *lsp_forwarded.peek();
-        if messages.len() > forwarded
-            && let Some(evaluator) = eval_handle.peek().as_ref()
-        {
-            for message in &messages[forwarded..] {
-                let _ = evaluator.send(Cmd::LspMessageSend {
-                    json: message.json().to_string(),
-                });
-            }
-            lsp_forwarded.set(messages.len());
         }
     });
 

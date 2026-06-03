@@ -1,7 +1,7 @@
 mod mock_lsp_server;
 
 use dioxus::prelude::*;
-use dioxus_codemirror::{CodeMirror, Language, LspBridge, LspMessage};
+use dioxus_codemirror::{CodeMirror, Language, LspBridge};
 
 use crate::mock_lsp_server::MockLspServer;
 
@@ -31,11 +31,10 @@ fn App() -> Element {
     let mut value_lsp =
         use_signal(|| "fn main() {\n    println!(\"hello\");\n}\n".to_string());
 
-    // The in-page mock language server, and the queue of messages it sends back
-    // to the editor's LSP client.
+    // The in-page mock language server. Its replies are returned synchronously
+    // and forwarded straight back to the editor's LSP client.
     let mock = use_signal(MockLspServer::default);
-    let lsp_inbound = use_signal(Vec::<LspMessage>::new);
-    let lsp = LspBridge::lsp_bridge_from_server("file:///main.rs", mock, lsp_inbound);
+    let lsp = LspBridge::lsp_bridge_from_server("file:///main.rs", mock);
     let lsp_log = mock.read().log.clone();
 
     rsx! {
