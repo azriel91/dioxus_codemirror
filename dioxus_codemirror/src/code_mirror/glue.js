@@ -138,7 +138,6 @@ if (config.lsp_uri) {
   try {
     const transport = {
       send(message) {
-        console.debug("[dioxus_codemirror] lsp -> server", message);
         dioxus.send({ type: "lsp_message_recv", json: message });
       },
       subscribe(handler) {
@@ -164,11 +163,6 @@ if (config.lsp_uri) {
   }
 }
 
-console.debug(
-  "[dioxus_codemirror] modules loaded, mounting",
-  config.mount_id,
-  `(${extensions.length} extensions)`,
-);
 const parent = await elementWait(config.mount_id);
 let view;
 try {
@@ -177,17 +171,11 @@ try {
     parent,
   });
 } catch (error) {
-  console.error("[dioxus_codemirror] editor creation failed", config.mount_id, error);
+  console.error("dioxus_codemirror: editor creation failed for", config.mount_id, error);
   throw error;
 }
 
 dioxus.send({ type: "ready" });
-console.debug(
-  "[dioxus_codemirror] editor ready",
-  config.mount_id,
-  "lsp:",
-  config.lsp_uri ?? "(none)",
-);
 
 // === Command loop === //
 while (true) {
@@ -214,11 +202,6 @@ while (true) {
       break;
     }
     case "lsp_message_send": {
-      console.debug(
-        "[dioxus_codemirror] lsp <- server",
-        cmd.json,
-        `(${lspHandlers.length} handler(s))`,
-      );
       for (const handler of lspHandlers) {
         handler(cmd.json);
       }

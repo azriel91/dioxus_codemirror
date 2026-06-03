@@ -111,10 +111,25 @@ The example shows four editors:
 
 CodeMirror and its dependencies are vendored into
 `dioxus_codemirror/assets/codemirror/` -- one ES module file per npm package,
-with each package's imports rewritten to its siblings so the tree is self
-contained and the core `@codemirror/state`/`view` modules load exactly once
-(CodeMirror requires a single instance of each). The folder is exposed as a
-Dioxus asset; the glue script imports the entry files from it.
+with each package's imports rewritten to its siblings. The folder is exposed as
+a Dioxus asset; the glue script imports a single `index.js` entry from it.
+
+### Why a single `index.js` entry
+
+The glue imports **only** `index.js`, which re-exports the symbols the component
+needs. This matters because Dioxus's asset pipeline runs esbuild over each `.js`
+file and *bundles* it -- inlining that file's imports. If the glue imported
+several entry files (`codemirror.js`, `codemirror__state.js`, ...) each would be
+bundled separately, loading **multiple copies of `@codemirror/state`**, which
+trips CodeMirror's "multiple instances of @codemirror/state" check in
+`EditorState.create`. Importing one entry means esbuild produces a single module
+graph with one shared `state` instance.
+
+Consequence: at runtime only the (bundled) `index.js` is loaded; the other
+per-package files in the build output are redundant -- they exist only as
+build-time inputs for esbuild to bundle `index.js` from, and are never fetched
+by the browser. The extra files in `target/dx/.../assets/codemirror/` are
+therefore harmless dead weight, not something to load or trim manually.
 
 ### Refreshing / upgrading versions
 
