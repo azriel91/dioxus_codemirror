@@ -26,29 +26,26 @@
 // their siblings, so the core `state`/`view` modules load exactly once and are
 // shared (CodeMirror requires a single instance of each).
 function codeMirrorLoaderScript(base) {
-  const entry = (file) => JSON.stringify(`${base}/${file}`);
+  // Import only the single entry. Dioxus bundles each vendored `.js` with
+  // esbuild (inlining its imports), so importing several entry files would load
+  // several copies of `@codemirror/state` and trip its "multiple instances"
+  // check. One entry => one bundle => one shared `state` instance.
+  const indexUrl = JSON.stringify(`${base}/index.js`);
   return `
 (async () => {
   try {
-    const [cm, state, view, langYaml, langMarkdown, lsp] = await Promise.all([
-      import(${entry("codemirror.js")}),
-      import(${entry("codemirror__state.js")}),
-      import(${entry("codemirror__view.js")}),
-      import(${entry("codemirror__lang-yaml.js")}),
-      import(${entry("codemirror__lang-markdown.js")}),
-      import(${entry("codemirror__lsp-client.js")}),
-    ]);
+    const cm = await import(${indexUrl});
     window.__dxcm = {
       EditorView: cm.EditorView,
       minimalSetup: cm.minimalSetup,
-      EditorState: state.EditorState,
-      Annotation: state.Annotation,
-      lineNumbers: view.lineNumbers,
-      highlightActiveLineGutter: view.highlightActiveLineGutter,
-      yaml: langYaml.yaml,
-      markdown: langMarkdown.markdown,
-      LSPClient: lsp.LSPClient,
-      languageServerExtensions: lsp.languageServerExtensions,
+      EditorState: cm.EditorState,
+      Annotation: cm.Annotation,
+      lineNumbers: cm.lineNumbers,
+      highlightActiveLineGutter: cm.highlightActiveLineGutter,
+      yaml: cm.yaml,
+      markdown: cm.markdown,
+      LSPClient: cm.LSPClient,
+      languageServerExtensions: cm.languageServerExtensions,
     };
   } catch (error) {
     window.__dxcmError = String(error);
