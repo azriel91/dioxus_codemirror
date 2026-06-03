@@ -4,7 +4,7 @@
 // the editor's lifetime, acting as a bidirectional message channel:
 //
 //   Rust -> JS   `await dioxus.recv()`  receives a `Cmd`:
-//     { type: "init",  mount_id, doc, lsp_uri }   (always sent first)
+//     { type: "init", mount_id, doc, line_numbers, language, lsp_uri }  (first)
 //     { type: "doc_set", doc }
 //     { type: "lsp_message_send", json }
 //     { type: "destroy" }
@@ -14,16 +14,74 @@
 //     { type: "doc_changed", doc }
 //     { type: "lsp_message_recv", json }
 //
-// CodeMirror is loaded at runtime from esm.sh, so there is no JS build step.
-// To run fully offline, save the `?bundle` output of these URLs into an asset
-// and import that local file instead.
+// NOTE: `document::eval` runs this code via `new Function(..)`, where dynamic
+// `import()` does not work. So CodeMirror is loaded once by an injected
+// `<script type="module">` (which has proper module context) that imports the
+// vendored modules and stashes them on `window.__dxcm`; this script just waits
+// for them. The modules live in a Dioxus folder asset (`cm_base`) and are
+// refreshed with `cargo run -p xtask -- vendor`.
 
-const ESM = "https://esm.sh";
-const CM = "6";
+// Module script that imports the vendored CodeMirror entry files (relative to
+// `base`) and exposes them on `window.__dxcm`. Importing the entries pulls in
+// their siblings, so the core `state`/`view` modules load exactly once and are
+// shared (CodeMirror requires a single instance of each).
+function codeMirrorLoaderScript(base) {
+  const entry = (file) => JSON.stringify(`${base}/${file}`);
+  return `
+(async () => {
+  try {
+    const [cm, state, view, langYaml, langMarkdown, lsp] = await Promise.all([
+      import(${entry("codemirror.js")}),
+      import(${entry("codemirror__state.js")}),
+      import(${entry("codemirror__view.js")}),
+      import(${entry("codemirror__lang-yaml.js")}),
+      import(${entry("codemirror__lang-markdown.js")}),
+      import(${entry("codemirror__lsp-client.js")}),
+    ]);
+    window.__dxcm = {
+      EditorView: cm.EditorView,
+      minimalSetup: cm.minimalSetup,
+      EditorState: state.EditorState,
+      Annotation: state.Annotation,
+      lineNumbers: view.lineNumbers,
+      highlightActiveLineGutter: view.highlightActiveLineGutter,
+      yaml: langYaml.yaml,
+      markdown: langMarkdown.markdown,
+      LSPClient: lsp.LSPClient,
+      languageServerExtensions: lsp.languageServerExtensions,
+    };
+  } catch (error) {
+    window.__dxcmError = String(error);
+    console.error("dioxus_codemirror: failed to load vendored CodeMirror", error);
+  }
+})();
+`;
+}
+
+// Inject the loader once, then wait until the modules are available.
+async function codeMirrorLoad(base) {
+  if (!window.__dxcmInjected) {
+    window.__dxcmInjected = true;
+    const script = document.createElement("script");
+    script.type = "module";
+    script.textContent = codeMirrorLoaderScript(base);
+    document.head.appendChild(script);
+  }
+  for (let attempt = 0; attempt < 1200; attempt += 1) {
+    if (window.__dxcm) {
+      return window.__dxcm;
+    }
+    if (window.__dxcmError) {
+      throw new Error(`dioxus_codemirror: ${window.__dxcmError}`);
+    }
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }
+  throw new Error("dioxus_codemirror: timed out loading CodeMirror");
+}
 
 // Resolve the mount element, which may not be in the DOM yet on first render.
 async function elementWait(id) {
-  for (let attempt = 0; attempt < 600; attempt += 1) {
+  for (let attempt = 0; attempt < 1200; attempt += 1) {
     const element = document.getElementById(id);
     if (element) {
       return element;
@@ -36,23 +94,27 @@ async function elementWait(id) {
 // The first message from Rust is always the init config.
 const config = await dioxus.recv();
 
-const [{ EditorView, basicSetup }, { EditorState, Annotation }, lspMod] =
-  await Promise.all([
-    import(`${ESM}/codemirror@${CM}?target=es2022`),
-    import(`${ESM}/@codemirror/state@${CM}?target=es2022`),
-    config.lsp_uri
-      ? import(`${ESM}/@codemirror/lsp-client@${CM}?target=es2022`)
-      : Promise.resolve(null),
-  ]);
-
-const parent = await elementWait(config.mount_id);
+const {
+  EditorView,
+  minimalSetup,
+  EditorState,
+  Annotation,
+  lineNumbers,
+  highlightActiveLineGutter,
+  yaml,
+  markdown,
+  LSPClient,
+  languageServerExtensions,
+} = await codeMirrorLoad(config.cm_base);
 
 // Guard so programmatic `doc_set` updates do not echo back as `doc_changed`.
 let applyingRemote = false;
 const remoteAnnotation = Annotation.define();
 
+// `minimalSetup` keeps the editor editable (history, default keymap, syntax
+// highlighting) without imposing a line-number gutter.
 const extensions = [
-  basicSetup,
+  minimalSetup,
   EditorView.updateListener.of((update) => {
     if (update.docChanged && !applyingRemote) {
       dioxus.send({ type: "doc_changed", doc: update.state.doc.toString() });
@@ -60,12 +122,22 @@ const extensions = [
   }),
 ];
 
+if (config.line_numbers) {
+  extensions.push(lineNumbers(), highlightActiveLineGutter());
+}
+
+if (config.language === "yaml") {
+  extensions.push(yaml());
+} else if (config.language === "markdown") {
+  extensions.push(markdown());
+}
+
 // === LSP wiring === //
 // A message-based Transport that bridges the editor's LSP client to Rust:
 // the client's outbound messages become `lsp_message_recv` events, and
 // `lsp_message_send` commands are delivered to the client's subscribers.
 let lspHandlers = [];
-if (lspMod && config.lsp_uri) {
+if (config.lsp_uri) {
   try {
     const transport = {
       send(message) {
@@ -79,9 +151,9 @@ if (lspMod && config.lsp_uri) {
       },
     };
 
-    const client = new lspMod.LSPClient({
+    const client = new LSPClient({
       rootUri: config.lsp_uri.replace(/\/[^/]*$/, "") || config.lsp_uri,
-      extensions: lspMod.languageServerExtensions(),
+      extensions: languageServerExtensions(),
     }).connect(transport);
 
     extensions.push(client.plugin(config.lsp_uri));
@@ -90,6 +162,7 @@ if (lspMod && config.lsp_uri) {
   }
 }
 
+const parent = await elementWait(config.mount_id);
 const view = new EditorView({
   state: EditorState.create({ doc: config.doc ?? "", extensions }),
   parent,

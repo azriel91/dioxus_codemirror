@@ -32,11 +32,13 @@
 pub mod cmd;
 pub mod code_mirror;
 pub mod evt;
+pub mod language;
 pub mod lsp;
 
 pub use crate::{
     cmd::Cmd,
     code_mirror::{CodeMirror, CodeMirrorProps},
     evt::Evt,
+    language::Language,
     lsp::{LspBridge, LspMessage, LspServer},
 };

@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "dioxus_codemirror",
     "example",
+    "xtask",
 ]
 
 [workspace.package]

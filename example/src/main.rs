@@ -1,16 +1,16 @@
 mod mock_lsp_server;
 
 use dioxus::prelude::*;
-use dioxus_codemirror::{CodeMirror, LspBridge, LspMessage};
+use dioxus_codemirror::{CodeMirror, Language, LspBridge, LspMessage};
 
 use crate::mock_lsp_server::MockLspServer;
 
-/// Styling for the editor and the demo page.
+/// Styling for the editors and the demo page.
 const STYLE: &str = r#"
 body { font-family: sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; }
-.cm-editor { height: 18rem; border: 1px solid #ddd; font-size: 14px; }
+.cm-editor { height: 12rem; border: 1px solid #ddd; font-size: 14px; }
 .cm-scroller { overflow: auto; }
-.dioxus-codemirror { margin-bottom: 1rem; }
+.dioxus-codemirror { margin-bottom: .5rem; }
 section { margin-top: 1.5rem; }
 pre { background: #f5f5f5; padding: .5rem; white-space: pre-wrap; word-break: break-all; }
 button { padding: .4rem .8rem; }
@@ -22,43 +22,59 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-    let mut value = use_signal(|| "fn main() {\n    println!(\"hello\");\n}\n".to_string());
+    let value_plain = use_signal(|| "Edit me -- plain text, fully editable.\n".to_string());
+    let value_yaml = use_signal(|| {
+        "name: example\nversion: 0.1.0\nitems:\n  - one\n  - two\n".to_string()
+    });
+    let value_markdown =
+        use_signal(|| "# Title\n\nSome **bold** and _italic_ text.\n\n- a\n- b\n".to_string());
+    let mut value_lsp =
+        use_signal(|| "fn main() {\n    println!(\"hello\");\n}\n".to_string());
 
     // The in-page mock language server, and the queue of messages it sends back
     // to the editor's LSP client.
     let mock = use_signal(MockLspServer::default);
     let lsp_inbound = use_signal(Vec::<LspMessage>::new);
     let lsp = LspBridge::lsp_bridge_from_server("file:///main.rs", mock, lsp_inbound);
-
     let lsp_log = mock.read().log.clone();
 
     rsx! {
         style { dangerous_inner_html: STYLE }
         h1 { "dioxus_codemirror example" }
 
-        CodeMirror { value, lsp }
-
         section {
-            h2 { "1. React to edits" }
-            p { "The editor's text, mirrored live from the bound signal:" }
-            pre { "{value}" }
+            h2 { "1. Plain editable text" }
+            p { "No line numbers, no language. Type to edit; the text mirrors live below." }
+            CodeMirror { value: value_plain }
+            pre { "{value_plain}" }
         }
 
         section {
-            h2 { "2. Set the value externally" }
-            button {
-                onclick: move |_| {
-                    value.set("// replaced from outside the editor\nlet answer = 42;\n".to_string());
-                },
-                "Set to template"
+            h2 { "2. YAML with line numbers" }
+            CodeMirror { value: value_yaml, line_numbers: true, language: Language::Yaml }
+        }
+
+        section {
+            h2 { "3. Markdown with line numbers" }
+            CodeMirror {
+                value: value_markdown,
+                line_numbers: true,
+                language: Language::Markdown,
             }
         }
 
         section {
-            h2 { "3. LSP traffic" }
+            h2 { "4. Set value externally + LSP" }
+            CodeMirror { value: value_lsp, line_numbers: true, lsp }
+            button {
+                onclick: move |_| {
+                    value_lsp.set("// replaced from outside the editor\nlet answer = 42;\n".to_string());
+                },
+                "Set to template"
+            }
             p {
                 "JSON-RPC exchanged with the in-page mock language server "
-                "(--> to server, <-- to editor). Hover over the code to trigger a request."
+                "(--> to server, <-- to editor):"
             }
             pre {
                 if lsp_log.is_empty() {

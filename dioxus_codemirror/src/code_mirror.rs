@@ -8,11 +8,16 @@ use dioxus::{
 use crate::{
     cmd::Cmd,
     evt::Evt,
+    language::Language,
     lsp::{lsp_bridge::LspBridge, lsp_message::LspMessage},
 };
 
 /// Source counter for unique editor mount ids, e.g. `cm-editor-0`.
 static EDITOR_ID_NEXT: AtomicU64 = AtomicU64::new(0);
+
+/// Vendored CodeMirror modules, served as a folder so sibling imports between
+/// the modules resolve. Refresh with `cargo run -p xtask -- vendor`.
+const CM_ASSETS: Asset = asset!("/assets/codemirror", AssetOptions::folder());
 
 /// Properties for the [`CodeMirror`] component.
 #[derive(Props, Clone, PartialEq)]
@@ -22,6 +27,13 @@ pub struct CodeMirrorProps {
     /// Editing in the browser writes the new text here; writing to it from
     /// elsewhere on the page replaces the editor's contents.
     pub value: Signal<String>,
+    /// Show a line-number gutter. Defaults to `false`.
+    #[props(default)]
+    pub line_numbers: bool,
+    /// Syntax highlighting language, e.g. `Language::Yaml`. Defaults to plain
+    /// text (`None`).
+    #[props(default)]
+    pub language: Option<Language>,
     /// Optional language server connection. When `Some`, an LSP client is
     /// attached for [`LspBridge::uri`].
     #[props(default)]
@@ -40,6 +52,8 @@ pub struct CodeMirrorProps {
 pub fn CodeMirror(props: CodeMirrorProps) -> Element {
     let CodeMirrorProps {
         mut value,
+        line_numbers,
+        language,
         lsp,
         on_ready,
     } = props;
@@ -68,7 +82,10 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
 
             let init = Cmd::Init {
                 mount_id,
+                cm_base: CM_ASSETS.to_string(),
                 doc: value.peek().clone(),
+                line_numbers,
+                language,
                 lsp_uri: lsp.as_ref().map(|lsp| lsp.uri.clone()),
             };
             if evaluator.send(init).is_err() {
