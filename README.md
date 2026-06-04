@@ -9,7 +9,8 @@ It supports:
 2. **Setting the value externally** -- writing the bound signal replaces the
    editor's contents (with an echo-loop guard so the two stay in sync).
 3. **Connecting to an in-page LSP server** -- a transport bridge to a language
-   server running in the page (e.g. compiled to WASM).
+   server running in the page (e.g. compiled to WASM), either synchronous or
+   async / worker-backed with server-pushed diagnostics.
 
 No JavaScript build step is required: the component drives CodeMirror through a
 single long-lived `document::eval` channel (`code_mirror/glue.js`). CodeMirror
@@ -42,7 +43,8 @@ The editor is always editable. Props:
 * `line_numbers: bool` -- show a line-number gutter (default `false`).
 * `language: Language` -- syntax highlighting, `Language::Yaml` or
   `Language::Markdown` (default plain text).
-* `lsp: LspBridge` -- connect an in-page language server (optional).
+* `lsp: LspBridge` -- connect an in-page language server, synchronous or async
+  (optional).
 
 ## Architecture
 
@@ -64,34 +66,40 @@ so the wire protocol is compile-time-checked on the Rust side.
 ## LSP
 
 `CodeMirror` takes an optional `LspBridge`, which connects the editor's
-`@codemirror/lsp-client` to an [`LspServer`] -- the extension point a real
-in-page language server implements (`fn lsp_message_handle(message) -> replies`).
+`@codemirror/lsp-client` to an in-page language server. There are two transport
+flavours, chosen by which constructor you call:
+
+### Synchronous: `LspBridge::lsp_bridge_from_server`
+
+Drives an [`LspServer`] -- the extension point a real in-page language server
+implements (`fn lsp_message_handle(message) -> replies`). It is request/response:
+each message from the editor is handed to the server, and the messages it
+*returns* are forwarded straight back, within the component's message loop, so
+there is no round-trip latency through the render cycle. This covers requests
+(e.g. `initialize`, hover, completion) and notifications.
+
 The `example` ships a `MockLspServer` that returns canned JSON-RPC responses, so
-the round trip is demonstrable without a real server. Replace it with your WASM
-language server to get genuine language features.
+the round trip is demonstrable without a real server.
 
-### Limitation: only synchronous, prompted replies are forwarded
+### Async / worker-capable: `LspBridge::lsp_bridge_from_server_async`
 
-`lsp_message_handle` is request/response: each message from the editor is handed
-to the server, and the messages it *returns* are forwarded straight back. This
-covers requests (e.g. `initialize`, hover, completion) and notifications.
+Drives an [`LspServerAsync`], for a server whose work does not complete within
+the call that receives a message -- one running in a **Web Worker** (or a real
+WASM server off the main thread), or one that emits **diagnostics** after a
+processing step.
 
-It does **not** yet support **server-initiated, unprompted messages** -- a
-server pushing `textDocument/publishDiagnostics` (lint/error squiggles) some time
-*after* a processing step, rather than as the return value of handling a request.
-Supporting that needs an async path: a channel the server can push onto at any
-time, drained into `Cmd::LspMessageSend`. A sketch:
+Instead of returning replies, the server is handed an `LspPusher` once (via
+`fn lsp_pusher_set(pusher)`) and pushes messages onto it whenever they are ready
+(`fn lsp_message_handle(message)` returns nothing). The component drains the
+receiving end and forwards each message to the editor, the same way prompted
+replies are. Because the push path is independent of any request, this is what
+makes **server-initiated, unprompted messages** work -- a server pushing
+`textDocument/publishDiagnostics` (lint/error squiggles) some time *after* a
+`didOpen`/`didChange`, rather than as the return value of handling a request.
 
-* give `LspServer` a way to emit messages out-of-band (e.g. take a
-  `Callback<LspMessage>` / channel sender on construction, or add a `poll`
-  method), and
-* in `code_mirror.rs`, forward those emissions to the editor from the message
-  loop (alongside the existing `Evt::LspMessageRecv` handling) -- for example by
-  `select!`ing over both the eval channel and the server's outbound channel.
-
-Until then, diagnostics must be returned in response to a message the editor
-sends (e.g. piggy-backed on the reply to a `didChange`/`didOpen`-triggered
-request), not pushed spontaneously.
+The `example` ships a `MockLspServerAsync` that pushes its responses and emits
+diagnostics on open/change. Replace either mock with your WASM language server to
+get genuine language features.
 
 ## Running the example
 
@@ -99,13 +107,17 @@ request), not pushed spontaneously.
 dx serve --platform web -p example
 ```
 
-The example shows four editors:
+The example shows five editors:
 
 1. **Plain editable text** -- type to edit; the mirrored text updates live.
 2. **YAML** with line numbers and highlighting.
 3. **Markdown** with line numbers and highlighting.
 4. **Set value externally + LSP** -- the **Set to template** button replaces the
-   contents, and the panel shows JSON-RPC flowing both ways to the mock server.
+   contents, and the panel shows JSON-RPC flowing both ways to the (synchronous)
+   mock server.
+5. **Async LSP + server-pushed diagnostics** -- the async mock server pushes its
+   replies and emits `textDocument/publishDiagnostics` unprompted on
+   open/change; the panel shows the pushed JSON-RPC.
 
 ## Vendored CodeMirror assets
 
@@ -148,3 +160,4 @@ there, re-run the command and commit the regenerated `assets/codemirror/`.
 [CodeMirror 6]: https://codemirror.net/
 [esm.sh]: https://esm.sh/
 [`LspServer`]: dioxus_codemirror/src/lsp/lsp_server.rs
+[`LspServerAsync`]: dioxus_codemirror/src/lsp/lsp_server_async.rs

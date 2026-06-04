@@ -15,5 +15,6 @@ dioxus = { version = "0.7", default-features = false, features = [
     "document",
     "asset",
 ] }
+futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

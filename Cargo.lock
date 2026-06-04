@@ -943,6 +943,7 @@ name = "dioxus_codemirror"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "futures",
  "serde",
  "serde_json",
 ]

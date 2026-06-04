@@ -4,8 +4,14 @@
 
 pub mod lsp_bridge;
 pub mod lsp_message;
+pub mod lsp_pusher;
 pub mod lsp_server;
+pub mod lsp_server_async;
 
 pub use self::{
-    lsp_bridge::LspBridge, lsp_message::LspMessage, lsp_server::LspServer,
+    lsp_bridge::LspBridge,
+    lsp_message::LspMessage,
+    lsp_pusher::{LspMessageRx, LspPusher},
+    lsp_server::LspServer,
+    lsp_server_async::LspServerAsync,
 };

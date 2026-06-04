@@ -1,9 +1,10 @@
 mod mock_lsp_server;
+mod mock_lsp_server_async;
 
 use dioxus::prelude::*;
 use dioxus_codemirror::{CodeMirror, Language, LspBridge};
 
-use crate::mock_lsp_server::MockLspServer;
+use crate::{mock_lsp_server::MockLspServer, mock_lsp_server_async::MockLspServerAsync};
 
 /// Styling for the editors and the demo page.
 const STYLE: &str = r#"
@@ -29,11 +30,20 @@ fn App() -> Element {
         use_signal(|| "# Title\n\nSome **bold** and _italic_ text.\n\n- a\n- b\n".to_string());
     let mut value_lsp = use_signal(|| "fn main() {\n    println!(\"hello\");\n}\n".to_string());
 
+    let value_lsp_async =
+        use_signal(|| "fn main() {\n    println!(\"diagnostics\");\n}\n".to_string());
+
     // The in-page mock language server. Its replies are returned synchronously
     // and forwarded straight back to the editor's LSP client.
     let mock = use_signal(MockLspServer::default);
     let lsp = LspBridge::lsp_bridge_from_server("file:///main.rs", mock);
     let lsp_log = mock.read().log.clone();
+
+    // The async mock language server. It pushes its replies -- and unprompted
+    // diagnostics -- back over a channel rather than returning them.
+    let mock_async = use_signal(MockLspServerAsync::default);
+    let lsp_async = LspBridge::lsp_bridge_from_server_async("file:///async.rs", mock_async);
+    let lsp_async_log = mock_async.read().log.clone();
 
     rsx! {
         style { dangerous_inner_html: STYLE }
@@ -78,6 +88,31 @@ fn App() -> Element {
                     "(waiting for the editor's LSP client to connect...)"
                 } else {
                     for line in lsp_log.iter() {
+                        "{line}\n"
+                    }
+                }
+            }
+        }
+
+        section {
+            h2 { "5. Async LSP + server-pushed diagnostics" }
+            p {
+                "This editor uses an async bridge. The server pushes its replies "
+                "back over a channel, and emits "
+                code { "textDocument/publishDiagnostics" }
+                " unprompted when the document opens or changes -- the case the "
+                "synchronous transport cannot express."
+            }
+            CodeMirror { value: value_lsp_async, line_numbers: true, lsp: lsp_async }
+            p {
+                "JSON-RPC exchanged with the in-page async mock language server "
+                "(--> to server, <-- pushed to editor):"
+            }
+            pre {
+                if lsp_async_log.is_empty() {
+                    "(waiting for the editor's LSP client to connect...)"
+                } else {
+                    for line in lsp_async_log.iter() {
                         "{line}\n"
                     }
                 }

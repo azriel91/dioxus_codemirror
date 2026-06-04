@@ -4,6 +4,7 @@ use dioxus::{
     document::{Eval, eval},
     prelude::*,
 };
+use futures::StreamExt;
 
 use crate::{
     cmd::Cmd,
@@ -71,6 +72,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
 
     // === Create the editor and pump JS events (Evt) into Rust === //
     let mount_id_future = mount_id.clone();
+    let lsp_push = lsp.clone();
     use_future(move || {
         let mount_id = mount_id_future.clone();
         let lsp = lsp.clone();
@@ -118,6 +120,35 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                     }
                     // Channel closed (component unmounted) or a decode error.
                     Err(_) => break,
+                }
+            }
+        }
+    });
+
+    // === Forward server-pushed LSP messages into the editor === //
+    // An async bridge (see `LspBridge::lsp_bridge_from_server_async`) lets the
+    // server push replies and unprompted messages -- e.g.
+    // `textDocument/publishDiagnostics` -- at any time. Drain them here and hand
+    // each to the editor's LSP client, the same way prompted replies are. The
+    // synchronous bridge has no receiver, so this loop ends immediately.
+    use_future(move || {
+        let lsp_push = lsp_push.clone();
+        async move {
+            let Some(mut messages_pushed_rx) =
+                lsp_push.as_ref().and_then(LspBridge::messages_pushed_rx_take)
+            else {
+                return;
+            };
+
+            while let Some(message) = messages_pushed_rx.next().await {
+                // The editor exists by the time the server pushes (pushes are
+                // driven by editor messages, which require a mounted editor); if
+                // it does not yet, the message predates the LSP client and is
+                // dropped.
+                if let Some(evaluator) = eval_handle.peek().as_ref() {
+                    let _ = evaluator.send(Cmd::LspMessageSend {
+                        json: message.json_into(),
+                    });
                 }
             }
         }
