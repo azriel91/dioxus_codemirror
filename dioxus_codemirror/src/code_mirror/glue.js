@@ -109,6 +109,11 @@ const THEME_PALETTE = [
   { name: "active-line", light: "#f0f3f6", dark: "#161b22" },
   { name: "active-line-gutter-bg", light: "#eaeef2", dark: "#161b22" },
   { name: "border", light: "#d0d7de", dark: "#30363d" },
+  { name: "tooltip-bg", light: "#ffffff", dark: "#161b22" },
+  { name: "tooltip-fg", light: "#1f2328", dark: "#e6edf3" },
+  { name: "tooltip-selected-bg", light: "#0969da", dark: "#094771" },
+  { name: "tooltip-selected-fg", light: "#ffffff", dark: "#ffffff" },
+  { name: "tooltip-info-bg", light: "#f6f8fa", dark: "#0d1117" },
   { name: "syntax-keyword", light: "#cf222e", dark: "#ff7b72" },
   { name: "syntax-string", light: "#0a3069", dark: "#a5d6ff" },
   { name: "syntax-comment", light: "#6e7781", dark: "#8b949e" },
@@ -208,6 +213,28 @@ ${themeActivate("dark")}
 .dioxus-codemirror .cm-activeLineGutter {
   background: var(--dxcm-active-line-gutter-bg);
   color: var(--dxcm-fg);
+}
+
+/* Autocomplete and hover tooltips. CodeMirror renders these inside the editor
+   DOM (so they fall under \`.dioxus-codemirror\`) with only a single-class base
+   theme, which these scoped rules outweigh. */
+.dioxus-codemirror .cm-tooltip {
+  background: var(--dxcm-tooltip-bg);
+  color: var(--dxcm-tooltip-fg);
+  border: 1px solid var(--dxcm-border);
+  border-radius: 6px;
+}
+.dioxus-codemirror .cm-tooltip-autocomplete ul li {
+  color: var(--dxcm-tooltip-fg);
+}
+.dioxus-codemirror .cm-tooltip-autocomplete ul li[aria-selected] {
+  background: var(--dxcm-tooltip-selected-bg);
+  color: var(--dxcm-tooltip-selected-fg);
+}
+.dioxus-codemirror .cm-completionInfo {
+  background: var(--dxcm-tooltip-info-bg);
+  color: var(--dxcm-tooltip-fg);
+  border: 1px solid var(--dxcm-border);
 }
 `;
   document.head.appendChild(style);
