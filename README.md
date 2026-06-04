@@ -45,10 +45,48 @@ The editor is always editable. Props:
   must have its `lang-*` Cargo feature enabled to be bundled; see
   [Choosing languages](#choosing-languages). `Language::Yaml` and
   `Language::Markdown` are on by default.
+* `features: EditorFeatures` -- optional editor features, off by default; see
+  [Editor features](#editor-features).
 * `theme: Theme` -- color theme, `Theme::Auto` (default, follows the OS
   `prefers-color-scheme`), `Theme::Light`, or `Theme::Dark`.
 * `lsp: LspBridge` -- connect an in-page language server, synchronous or async
   (optional).
+
+## Editor features
+
+`EditorFeatures` toggles optional CodeMirror behaviours, with field/method names
+mirroring the CodeMirror extension each enables (API parity). All are off by
+default. Build one with the chained methods and pass it to `features`:
+
+```rust
+use dioxus_codemirror::{CodeMirror, EditorFeatures};
+
+rsx! {
+    CodeMirror {
+        value,
+        features: EditorFeatures::default()
+            .allow_multiple_selections()   // Alt-click for multiple cursors
+            .highlight_selection_matches() // highlight + Mod-d select next match
+            .bracket_matching()
+            .close_brackets()
+            .line_wrapping(),
+    }
+}
+```
+
+| Method | CodeMirror extension |
+| --- | --- |
+| `allow_multiple_selections()` | `EditorState.allowMultipleSelections` |
+| `highlight_selection_matches()` | `highlightSelectionMatches` + `selectNextOccurrence` (`Mod-d`) |
+| `highlight_active_line()` | `highlightActiveLine` |
+| `bracket_matching()` | `bracketMatching` |
+| `close_brackets()` | `closeBrackets` |
+| `rectangular_selection()` | `rectangularSelection` + `crosshairCursor` (Alt-drag) |
+| `indent_on_input()` | `indentOnInput` |
+| `highlight_whitespace()` | `highlightWhitespace` |
+| `line_wrapping()` | `EditorView.lineWrapping` |
+| `read_only()` | `EditorState.readOnly` |
+| `tab_size(n)` | `EditorState.tabSize` |
 
 ## Architecture
 

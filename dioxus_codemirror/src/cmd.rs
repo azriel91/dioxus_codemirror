@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::language::Language;
+use crate::{editor_features::EditorFeatures, language::Language};
 
 /// Commands sent from Rust to the CodeMirror glue script (Rust -> JS).
 ///
@@ -18,14 +18,16 @@ pub enum Cmd {
     /// e.g. `"/assets/codemirror"`. `doc`: the initial document text.
     /// `line_numbers`: whether to show the line-number gutter. `language`:
     /// syntax highlighting language, e.g. `Some(Language::Yaml)`, or `None` for
-    /// plain text. `lsp_uri`: the file URI to attach the LSP client for, e.g.
-    /// `Some("file:///main.rs")`, or `None` to disable LSP.
+    /// plain text. `features`: optional editor features to enable (see
+    /// [`EditorFeatures`]). `lsp_uri`: the file URI to attach the LSP client
+    /// for, e.g. `Some("file:///main.rs")`, or `None` to disable LSP.
     Init {
         mount_id: String,
         cm_base: String,
         doc: String,
         line_numbers: bool,
         language: Option<Language>,
+        features: EditorFeatures,
         lsp_uri: Option<String>,
     },
     /// Replace the editor's document with `doc`, e.g. when the bound data

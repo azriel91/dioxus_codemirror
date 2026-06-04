@@ -191,10 +191,20 @@ fn index_js_render(languages_enabled: &[&LanguageManifest]) -> String {
     index_js.push_str("export { EditorView, minimalSetup } from \"./codemirror.js\";\n");
     index_js.push_str("export { EditorState, Annotation } from \"./codemirror__state.js\";\n");
     index_js.push_str(
-        "export { lineNumbers, highlightActiveLineGutter } from \"./codemirror__view.js\";\n",
+        "export { lineNumbers, highlightActiveLineGutter, highlightActiveLine, \
+         highlightWhitespace, rectangularSelection, crosshairCursor, keymap } \
+         from \"./codemirror__view.js\";\n",
     );
     index_js.push_str(
-        "export { HighlightStyle, syntaxHighlighting } from \"./codemirror__language.js\";\n",
+        "export { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } \
+         from \"./codemirror__language.js\";\n",
+    );
+    index_js.push_str(
+        "export { highlightSelectionMatches, selectNextOccurrence } \
+         from \"./codemirror__search.js\";\n",
+    );
+    index_js.push_str(
+        "export { closeBrackets, closeBracketsKeymap } from \"./codemirror__autocomplete.js\";\n",
     );
     index_js.push_str("export { tags } from \"./lezer__highlight.js\";\n");
     index_js.push_str(

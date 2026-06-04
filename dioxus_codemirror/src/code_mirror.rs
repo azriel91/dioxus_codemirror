@@ -8,6 +8,7 @@ use futures::StreamExt;
 
 use crate::{
     cmd::Cmd,
+    editor_features::EditorFeatures,
     evt::Evt,
     language::Language,
     lsp::{lsp_bridge::LspBridge, lsp_message::LspMessage},
@@ -36,6 +37,11 @@ pub struct CodeMirrorProps {
     /// text (`None`).
     #[props(default)]
     pub language: Option<Language>,
+    /// Optional CodeMirror features to enable, e.g.
+    /// `EditorFeatures::default().allow_multiple_selections()`. Defaults to all
+    /// off.
+    #[props(default)]
+    pub features: EditorFeatures,
     /// Color theme, e.g. `Theme::Dark`. Defaults to [`Theme::Auto`], which
     /// follows the operating system's `prefers-color-scheme`.
     #[props(default)]
@@ -60,6 +66,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
         mut value,
         line_numbers,
         language,
+        features,
         theme,
         lsp,
         on_ready,
@@ -91,6 +98,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                 doc: value.peek().clone(),
                 line_numbers,
                 language,
+                features,
                 lsp_uri: lsp.as_ref().map(|lsp| lsp.uri.clone()),
             };
             if evaluator.send(init).is_err() {

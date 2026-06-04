@@ -2,7 +2,7 @@ mod mock_lsp_server;
 mod mock_lsp_server_async;
 
 use dioxus::prelude::*;
-use dioxus_codemirror::{CodeMirror, Language, LspBridge, Theme};
+use dioxus_codemirror::{CodeMirror, EditorFeatures, Language, LspBridge, Theme};
 
 use crate::{mock_lsp_server::MockLspServer, mock_lsp_server_async::MockLspServerAsync};
 
@@ -67,9 +67,23 @@ fn App() -> Element {
         h1 { "dioxus_codemirror example" }
 
         section {
-            h2 { "1. Plain editable text" }
-            p { "No line numbers, no language. Type to edit; the text mirrors live below." }
-            CodeMirror { value: value_plain }
+            h2 { "1. Plain editable text + features" }
+            p {
+                "No line numbers, no language. Several CodeMirror features are on: "
+                "Alt-click for multiple cursors, Mod-d to select the next match of "
+                "the current word, matching-bracket highlighting, auto-closing "
+                "brackets, and line wrapping."
+            }
+            CodeMirror {
+                value: value_plain,
+                features: EditorFeatures::default()
+                    .allow_multiple_selections()
+                    .highlight_selection_matches()
+                    .highlight_active_line()
+                    .bracket_matching()
+                    .close_brackets()
+                    .line_wrapping(),
+            }
             pre { "{value_plain}" }
         }
 

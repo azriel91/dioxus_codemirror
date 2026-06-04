@@ -298,8 +298,19 @@ const {
   Annotation,
   lineNumbers,
   highlightActiveLineGutter,
+  highlightActiveLine,
+  highlightWhitespace,
+  rectangularSelection,
+  crosshairCursor,
+  keymap,
   HighlightStyle,
   syntaxHighlighting,
+  bracketMatching,
+  indentOnInput,
+  highlightSelectionMatches,
+  selectNextOccurrence,
+  closeBrackets,
+  closeBracketsKeymap,
   tags,
   LSPClient,
   languageServerExtensions,
@@ -332,6 +343,55 @@ const extensions = [
 
 if (config.line_numbers) {
   extensions.push(lineNumbers(), highlightActiveLineGutter());
+}
+
+// === Optional editor features === //
+// Each maps to the CodeMirror extension of the same name, toggled by a prop
+// (see `EditorFeatures` on the Rust side). `minimalSetup` already includes
+// `drawSelection` and the default keymap, so multiple selections only need the
+// facet and added keymaps layer on top of the defaults.
+const features = config.features ?? {};
+
+if (features.allow_multiple_selections) {
+  extensions.push(EditorState.allowMultipleSelections.of(true));
+}
+if (features.highlight_active_line) {
+  extensions.push(highlightActiveLine());
+}
+if (features.highlight_selection_matches) {
+  // Highlight other occurrences of the current word/selection, and bind
+  // `Mod-d` to extend the selection to the next occurrence (as in `basicSetup`'s
+  // search keymap, which `minimalSetup` omits).
+  extensions.push(
+    highlightSelectionMatches(),
+    keymap.of([
+      { key: "Mod-d", run: selectNextOccurrence, preventDefault: true },
+    ]),
+  );
+}
+if (features.bracket_matching) {
+  extensions.push(bracketMatching());
+}
+if (features.close_brackets) {
+  extensions.push(closeBrackets(), keymap.of(closeBracketsKeymap));
+}
+if (features.rectangular_selection) {
+  extensions.push(rectangularSelection(), crosshairCursor());
+}
+if (features.indent_on_input) {
+  extensions.push(indentOnInput());
+}
+if (features.highlight_whitespace) {
+  extensions.push(highlightWhitespace());
+}
+if (features.line_wrapping) {
+  extensions.push(EditorView.lineWrapping);
+}
+if (features.read_only) {
+  extensions.push(EditorState.readOnly.of(true));
+}
+if (typeof features.tab_size === "number") {
+  extensions.push(EditorState.tabSize.of(features.tab_size));
 }
 
 // Apply the syntax extension for the requested language, if it was bundled. A
