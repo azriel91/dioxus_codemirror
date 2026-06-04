@@ -91,15 +91,62 @@ async function elementWait(id) {
   throw new Error(`dioxus_codemirror: mount element #${id} not found`);
 }
 
-// Inject the editor chrome stylesheet once. The colors are CSS variables whose
-// palette is chosen by the mount element's `data-theme` attribute (set from the
-// `Theme` prop): `auto` (or absent) follows the OS color scheme
-// (`prefers-color-scheme`), while `light`/`dark` force a palette regardless of
-// the OS. So a single editor reads correctly in both modes with no consumer
-// configuration, yet can be pinned per editor. Rules are scoped under
-// `.dioxus-codemirror` (the mount div's class) so they win over CodeMirror's
-// single-class base theme and never leak to the host page. Syntax token colors
-// are applied separately, in JS, via a `HighlightStyle` (see
+// The themeable CSS variables and their per-scheme source colors, each defined
+// exactly once. `name` is the variable suffix, e.g. `syntax-keyword`; `light`
+// and `dark` are that variable's source color in each scheme, e.g. `#cf222e` /
+// `#ff7b72`. The stylesheet emits these as `--dxcm-light-<name>` /
+// `--dxcm-dark-<name>` and then aliases the active `--dxcm-<name>` -- the only
+// variables the chrome rules and the syntax `HighlightStyle` read -- to one
+// scheme's sources or the other, so the colors are never duplicated.
+const THEME_PALETTE = [
+  { name: "bg", light: "#ffffff", dark: "#0d1117" },
+  { name: "fg", light: "#1f2328", dark: "#e6edf3" },
+  { name: "caret", light: "#1f2328", dark: "#e6edf3" },
+  { name: "selection", light: "#d9d9d9", dark: "#2d333b" },
+  { name: "selection-focused", light: "#c5dbff", dark: "#2f4b73" },
+  { name: "gutter-bg", light: "#f6f8fa", dark: "#0d1117" },
+  { name: "gutter-fg", light: "#8c959f", dark: "#6e7681" },
+  { name: "active-line", light: "#f0f3f6", dark: "#161b22" },
+  { name: "active-line-gutter-bg", light: "#eaeef2", dark: "#161b22" },
+  { name: "border", light: "#d0d7de", dark: "#30363d" },
+  { name: "syntax-keyword", light: "#cf222e", dark: "#ff7b72" },
+  { name: "syntax-string", light: "#0a3069", dark: "#a5d6ff" },
+  { name: "syntax-comment", light: "#6e7781", dark: "#8b949e" },
+  { name: "syntax-number", light: "#0550ae", dark: "#79c0ff" },
+  { name: "syntax-function", light: "#8250df", dark: "#d2a8ff" },
+  { name: "syntax-type", light: "#953800", dark: "#ffa657" },
+  { name: "syntax-constant", light: "#0550ae", dark: "#79c0ff" },
+  { name: "syntax-operator", light: "#0550ae", dark: "#79c0ff" },
+  { name: "syntax-property", light: "#116329", dark: "#7ee787" },
+  { name: "syntax-heading", light: "#0550ae", dark: "#79c0ff" },
+  { name: "syntax-link", light: "#0a3069", dark: "#a5d6ff" },
+  { name: "syntax-invalid", light: "#cf222e", dark: "#ffa198" },
+];
+
+// `--dxcm-light-<name>: <light>; --dxcm-dark-<name>: <dark>;` for every entry --
+// both palettes declared once.
+const themePaletteSource = THEME_PALETTE.map(
+  ({ name, light, dark }) =>
+    `  --dxcm-light-${name}: ${light};\n  --dxcm-dark-${name}: ${dark};`,
+).join("\n");
+
+// `--dxcm-<name>: var(--dxcm-<scheme>-<name>);` for every entry -- points the
+// active variables at the chosen scheme's sources, with no color duplicated.
+function themeActivate(scheme) {
+  return THEME_PALETTE.map(
+    ({ name }) => `  --dxcm-${name}: var(--dxcm-${scheme}-${name});`,
+  ).join("\n");
+}
+
+// Inject the editor chrome stylesheet once. Colors come from the active
+// `--dxcm-<name>` variables, whose scheme follows the mount element's
+// `data-theme` attribute (set from the `Theme` prop): `auto` (or absent) tracks
+// the OS color scheme (`prefers-color-scheme`), while `light`/`dark` pin a
+// palette regardless of the OS. So a single editor reads correctly in both
+// modes with no consumer configuration, yet can be pinned per editor. Rules are
+// scoped under `.dioxus-codemirror` (the mount div's class) so they win over
+// CodeMirror's single-class base theme and never leak to the host page. Syntax
+// token colors are applied separately, in JS, via a `HighlightStyle` (see
 // `themeHighlightStyle`) because CodeMirror generates those token class names
 // dynamically and they cannot be targeted from here.
 function themeStylesInject() {
@@ -110,86 +157,23 @@ function themeStylesInject() {
   const style = document.createElement("style");
   style.id = "dioxus-codemirror-theme";
   style.textContent = `
-/* Light palette: the default, and also \`theme: Light\` forced on a dark OS
-   (the attribute selector outranks the bare-class dark rules below). */
-.dioxus-codemirror,
-.dioxus-codemirror[data-theme="light"] {
-  --dxcm-bg: #ffffff;
-  --dxcm-fg: #1f2328;
-  --dxcm-caret: #1f2328;
-  --dxcm-selection: #d9d9d9;
-  --dxcm-selection-focused: #c5dbff;
-  --dxcm-gutter-bg: #f6f8fa;
-  --dxcm-gutter-fg: #8c959f;
-  --dxcm-active-line: #f0f3f6;
-  --dxcm-active-line-gutter-bg: #eaeef2;
-  --dxcm-border: #d0d7de;
-  --dxcm-syntax-keyword: #cf222e;
-  --dxcm-syntax-string: #0a3069;
-  --dxcm-syntax-comment: #6e7781;
-  --dxcm-syntax-number: #0550ae;
-  --dxcm-syntax-function: #8250df;
-  --dxcm-syntax-type: #953800;
-  --dxcm-syntax-constant: #0550ae;
-  --dxcm-syntax-operator: #0550ae;
-  --dxcm-syntax-property: #116329;
-  --dxcm-syntax-heading: #0550ae;
-  --dxcm-syntax-link: #0a3069;
-  --dxcm-syntax-invalid: #cf222e;
+/* Both palette sources, plus the default (light) active aliases. */
+.dioxus-codemirror {
+${themePaletteSource}
+${themeActivate("light")}
 }
 
-/* Dark palette, written once as a reusable list and applied to the two cases
-   that need it: \`theme: Auto\` on a dark OS, and \`theme: Dark\` always. */
+/* \`theme: Auto\` on a dark OS: re-alias the active variables to the dark
+   sources. The \`:not\` leaves editors pinned to \`theme: Light\` untouched. */
 @media (prefers-color-scheme: dark) {
   .dioxus-codemirror:not([data-theme="light"]) {
-    --dxcm-bg: #0d1117;
-    --dxcm-fg: #e6edf3;
-    --dxcm-caret: #e6edf3;
-    --dxcm-selection: #2d333b;
-    --dxcm-selection-focused: #2f4b73;
-    --dxcm-gutter-bg: #0d1117;
-    --dxcm-gutter-fg: #6e7681;
-    --dxcm-active-line: #161b22;
-    --dxcm-active-line-gutter-bg: #161b22;
-    --dxcm-border: #30363d;
-    --dxcm-syntax-keyword: #ff7b72;
-    --dxcm-syntax-string: #a5d6ff;
-    --dxcm-syntax-comment: #8b949e;
-    --dxcm-syntax-number: #79c0ff;
-    --dxcm-syntax-function: #d2a8ff;
-    --dxcm-syntax-type: #ffa657;
-    --dxcm-syntax-constant: #79c0ff;
-    --dxcm-syntax-operator: #79c0ff;
-    --dxcm-syntax-property: #7ee787;
-    --dxcm-syntax-heading: #79c0ff;
-    --dxcm-syntax-link: #a5d6ff;
-    --dxcm-syntax-invalid: #ffa198;
+${themeActivate("dark")}
   }
 }
 
+/* \`theme: Dark\`: dark regardless of the OS. */
 .dioxus-codemirror[data-theme="dark"] {
-  --dxcm-bg: #0d1117;
-  --dxcm-fg: #e6edf3;
-  --dxcm-caret: #e6edf3;
-  --dxcm-selection: #2d333b;
-  --dxcm-selection-focused: #2f4b73;
-  --dxcm-gutter-bg: #0d1117;
-  --dxcm-gutter-fg: #6e7681;
-  --dxcm-active-line: #161b22;
-  --dxcm-active-line-gutter-bg: #161b22;
-  --dxcm-border: #30363d;
-  --dxcm-syntax-keyword: #ff7b72;
-  --dxcm-syntax-string: #a5d6ff;
-  --dxcm-syntax-comment: #8b949e;
-  --dxcm-syntax-number: #79c0ff;
-  --dxcm-syntax-function: #d2a8ff;
-  --dxcm-syntax-type: #ffa657;
-  --dxcm-syntax-constant: #79c0ff;
-  --dxcm-syntax-operator: #79c0ff;
-  --dxcm-syntax-property: #7ee787;
-  --dxcm-syntax-heading: #79c0ff;
-  --dxcm-syntax-link: #a5d6ff;
-  --dxcm-syntax-invalid: #ffa198;
+${themeActivate("dark")}
 }
 
 .dioxus-codemirror .cm-editor {
