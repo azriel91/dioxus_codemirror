@@ -107,6 +107,8 @@ impl CodemirrorVendor {
 export { EditorView, minimalSetup } from \"./codemirror.js\";
 export { EditorState, Annotation } from \"./codemirror__state.js\";
 export { lineNumbers, highlightActiveLineGutter } from \"./codemirror__view.js\";
+export { HighlightStyle, syntaxHighlighting } from \"./codemirror__language.js\";
+export { tags } from \"./lezer__highlight.js\";
 export { yaml } from \"./codemirror__lang-yaml.js\";
 export { markdown } from \"./codemirror__lang-markdown.js\";
 export { LSPClient, languageServerExtensions } from \"./codemirror__lsp-client.js\";

@@ -7,14 +7,28 @@ use dioxus_codemirror::{CodeMirror, Language, LspBridge};
 use crate::{mock_lsp_server::MockLspServer, mock_lsp_server_async::MockLspServerAsync};
 
 /// Styling for the editors and the demo page.
+///
+/// The page follows the OS color scheme (`prefers-color-scheme`) to match the
+/// CodeMirror component, which themes itself for light and dark automatically.
+/// The editor border reuses the component's `--dxcm-border` variable so it
+/// flips alongside the editor chrome.
 const STYLE: &str = r#"
-body { font-family: sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; }
-.cm-editor { height: 12rem; border: 1px solid #ddd; font-size: 14px; }
+:root { color-scheme: light dark; }
+body {
+  font-family: sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+  background: #ffffff; color: #1f2328;
+}
+.cm-editor { height: 12rem; border: 1px solid var(--dxcm-border, #ddd); font-size: 14px; }
 .cm-scroller { overflow: auto; }
 .dioxus-codemirror { margin-bottom: .5rem; }
 section { margin-top: 1.5rem; }
 pre { background: #f5f5f5; padding: .5rem; white-space: pre-wrap; word-break: break-all; }
 button { padding: .4rem .8rem; }
+
+@media (prefers-color-scheme: dark) {
+  body { background: #0d1117; color: #e6edf3; }
+  pre { background: #161b22; }
+}
 "#;
 
 fn main() {
