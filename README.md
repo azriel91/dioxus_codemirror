@@ -43,6 +43,8 @@ The editor is always editable. Props:
 * `line_numbers: bool` -- show a line-number gutter (default `false`).
 * `language: Language` -- syntax highlighting, `Language::Yaml` or
   `Language::Markdown` (default plain text).
+* `theme: Theme` -- color theme, `Theme::Auto` (default, follows the OS
+  `prefers-color-scheme`), `Theme::Light`, or `Theme::Dark`.
 * `lsp: LspBridge` -- connect an in-page language server, synchronous or async
   (optional).
 

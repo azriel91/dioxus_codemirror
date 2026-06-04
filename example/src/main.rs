@@ -2,7 +2,7 @@ mod mock_lsp_server;
 mod mock_lsp_server_async;
 
 use dioxus::prelude::*;
-use dioxus_codemirror::{CodeMirror, Language, LspBridge};
+use dioxus_codemirror::{CodeMirror, Language, LspBridge, Theme};
 
 use crate::{mock_lsp_server::MockLspServer, mock_lsp_server_async::MockLspServerAsync};
 
@@ -42,6 +42,9 @@ fn App() -> Element {
         use_signal(|| "name: example\nversion: 0.1.0\nitems:\n  - one\n  - two\n".to_string());
     let value_markdown =
         use_signal(|| "# Title\n\nSome **bold** and _italic_ text.\n\n- a\n- b\n".to_string());
+    // Drives the YAML editor's `theme` prop below. `Theme::Auto` (the default)
+    // follows the OS color scheme; the buttons pin a palette per editor.
+    let mut theme_yaml = use_signal(|| Theme::Auto);
     let mut value_lsp = use_signal(|| "fn main() {\n    println!(\"hello\");\n}\n".to_string());
 
     let value_lsp_async =
@@ -72,7 +75,21 @@ fn App() -> Element {
 
         section {
             h2 { "2. YAML with line numbers" }
-            CodeMirror { value: value_yaml, line_numbers: true, language: Language::Yaml }
+            p {
+                "The editor themes itself for light and dark automatically. Use the "
+                "buttons to override the OS color scheme for this editor."
+            }
+            div {
+                button { onclick: move |_| theme_yaml.set(Theme::Auto), "Auto" }
+                button { onclick: move |_| theme_yaml.set(Theme::Light), "Light" }
+                button { onclick: move |_| theme_yaml.set(Theme::Dark), "Dark" }
+            }
+            CodeMirror {
+                value: value_yaml,
+                line_numbers: true,
+                language: Language::Yaml,
+                theme: theme_yaml(),
+            }
         }
 
         section {

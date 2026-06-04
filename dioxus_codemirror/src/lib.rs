@@ -34,6 +34,7 @@ pub mod code_mirror;
 pub mod evt;
 pub mod language;
 pub mod lsp;
+pub mod theme;
 
 pub use crate::{
     cmd::Cmd,
@@ -41,4 +42,5 @@ pub use crate::{
     evt::Evt,
     language::Language,
     lsp::{LspBridge, LspMessage, LspMessageRx, LspPusher, LspServer, LspServerAsync},
+    theme::Theme,
 };

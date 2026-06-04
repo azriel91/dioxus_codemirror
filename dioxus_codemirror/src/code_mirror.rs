@@ -11,6 +11,7 @@ use crate::{
     evt::Evt,
     language::Language,
     lsp::{lsp_bridge::LspBridge, lsp_message::LspMessage},
+    theme::Theme,
 };
 
 /// Source counter for unique editor mount ids, e.g. `cm-editor-0`.
@@ -35,6 +36,10 @@ pub struct CodeMirrorProps {
     /// text (`None`).
     #[props(default)]
     pub language: Option<Language>,
+    /// Color theme, e.g. `Theme::Dark`. Defaults to [`Theme::Auto`], which
+    /// follows the operating system's `prefers-color-scheme`.
+    #[props(default)]
+    pub theme: Theme,
     /// Optional language server connection. When `Some`, an LSP client is
     /// attached for [`LspBridge::uri`].
     #[props(default)]
@@ -55,6 +60,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
         mut value,
         line_numbers,
         language,
+        theme,
         lsp,
         on_ready,
     } = props;
@@ -170,6 +176,10 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
     });
 
     rsx! {
-        div { id: "{mount_id}", class: "dioxus-codemirror" }
+        div {
+            id: "{mount_id}",
+            class: "dioxus-codemirror",
+            "data-theme": theme.theme_attr(),
+        }
     }
 }
