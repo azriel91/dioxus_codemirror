@@ -6,4 +6,6 @@ publish = false
 
 [dependencies]
 regex = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 ureq = "2"

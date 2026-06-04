@@ -21,35 +21,26 @@
 // for them. The modules live in a Dioxus folder asset (`cm_base`) and are
 // refreshed with `cargo run -p xtask -- vendor`.
 
-// Module script that imports the vendored CodeMirror entry files (relative to
-// `base`) and exposes them on `window.__dxcm`. Importing the entries pulls in
-// their siblings, so the core `state`/`view` modules load exactly once and are
+// Module script that imports the vendored CodeMirror entry file (relative to
+// `base`) and exposes its exports on `window.__dxcm`. Importing the entry pulls
+// in its siblings, so the core `state`/`view` modules load exactly once and are
 // shared (CodeMirror requires a single instance of each).
 function codeMirrorLoaderScript(base) {
   // Import only the single entry. Dioxus bundles each vendored `.js` with
   // esbuild (inlining its imports), so importing several entry files would load
   // several copies of `@codemirror/state` and trip its "multiple instances"
   // check. One entry => one bundle => one shared `state` instance.
+  //
+  // The entry's exports vary with the consumer's enabled `lang-*` Cargo
+  // features (see `build.rs`): the core symbols are always present, and a
+  // `languages` map holds the bundled language factories keyed by name. Spread
+  // the whole namespace so this script needs no per-language edits.
   const indexUrl = JSON.stringify(`${base}/index.js`);
   return `
 (async () => {
   try {
     const cm = await import(${indexUrl});
-    window.__dxcm = {
-      EditorView: cm.EditorView,
-      minimalSetup: cm.minimalSetup,
-      EditorState: cm.EditorState,
-      Annotation: cm.Annotation,
-      lineNumbers: cm.lineNumbers,
-      highlightActiveLineGutter: cm.highlightActiveLineGutter,
-      HighlightStyle: cm.HighlightStyle,
-      syntaxHighlighting: cm.syntaxHighlighting,
-      tags: cm.tags,
-      yaml: cm.yaml,
-      markdown: cm.markdown,
-      LSPClient: cm.LSPClient,
-      languageServerExtensions: cm.languageServerExtensions,
-    };
+    window.__dxcm = { ...cm };
   } catch (error) {
     window.__dxcmError = String(error);
     console.error("dioxus_codemirror: failed to load vendored CodeMirror", error);
@@ -310,10 +301,11 @@ const {
   HighlightStyle,
   syntaxHighlighting,
   tags,
-  yaml,
-  markdown,
   LSPClient,
   languageServerExtensions,
+  // Map of bundled language factories keyed by name, e.g. `{ yaml, markdown }`.
+  // Which languages are present depends on the enabled `lang-*` Cargo features.
+  languages,
 } = await codeMirrorLoad(config.cm_base);
 
 // Guard so programmatic `doc_set` updates do not echo back as `doc_changed`.
@@ -342,10 +334,19 @@ if (config.line_numbers) {
   extensions.push(lineNumbers(), highlightActiveLineGutter());
 }
 
-if (config.language === "yaml") {
-  extensions.push(yaml());
-} else if (config.language === "markdown") {
-  extensions.push(markdown());
+// Apply the syntax extension for the requested language, if it was bundled. A
+// language is bundled only when its `lang-*` Cargo feature is enabled; an
+// un-bundled language falls back to plain text rather than failing.
+if (config.language) {
+  const languageFactory = languages?.[config.language];
+  if (languageFactory) {
+    extensions.push(languageFactory());
+  } else {
+    console.warn(
+      `dioxus_codemirror: language "${config.language}" is not bundled; ` +
+        `enable its Cargo feature (lang-${config.language}) on dioxus_codemirror`,
+    );
+  }
 }
 
 // === LSP wiring === //
