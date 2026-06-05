@@ -299,6 +299,74 @@ function themeHighlightStyle() {
   ]);
 }
 
+// `Mod-d` command: add the next occurrence of the current selection as an extra
+// selection range. Unlike CodeMirror's `selectNextOccurrence`, this matches
+// substrings -- it does not restrict a whole-word selection to whole-word
+// matches -- so selecting "hello" also extends into "helloabcd". Requires
+// `allow_multiple_selections`.
+function selectNextMatch(view) {
+  const { state } = view;
+  const { selection } = state;
+  const main = selection.main;
+
+  // First press on a bare cursor: select the word under it (the term to extend).
+  if (main.empty) {
+    const word = state.wordAt(main.head);
+    if (!word) {
+      return false;
+    }
+    view.dispatch({
+      selection: EditorSelection.create(
+        selection.ranges.map((range, index) =>
+          index === selection.mainIndex
+            ? EditorSelection.range(word.from, word.to)
+            : range,
+        ),
+        selection.mainIndex,
+      ),
+    });
+    return true;
+  }
+
+  // Every existing range must hold the same text, else there is no single term
+  // to extend (mirrors CodeMirror's behaviour).
+  const query = state.sliceDoc(main.from, main.to);
+  const sameText = selection.ranges.every(
+    (range) => state.sliceDoc(range.from, range.to) === query,
+  );
+  if (!query || !sameText) {
+    return false;
+  }
+
+  const next = selectNextMatchFind(state, query, selection.ranges);
+  if (!next) {
+    return false;
+  }
+
+  view.dispatch({
+    selection: selection.addRange(EditorSelection.range(next.from, next.to)),
+    scrollIntoView: true,
+  });
+  return true;
+}
+
+// Next occurrence of `query` after the last selection range, wrapping around to
+// the start, skipping ranges that are already selected.
+function selectNextMatchFind(state, query, ranges) {
+  const taken = new Set(ranges.map((range) => `${range.from}:${range.to}`));
+  const after = ranges[ranges.length - 1].to;
+  const scan = (from, to) => {
+    const cursor = new SearchCursor(state.doc, query, from, to);
+    while (!cursor.next().done) {
+      if (!taken.has(`${cursor.value.from}:${cursor.value.to}`)) {
+        return cursor.value;
+      }
+    }
+    return null;
+  };
+  return scan(after, state.doc.length) ?? scan(0, after);
+}
+
 // The first message from Rust is always the init config.
 const config = await dioxus.recv();
 
@@ -306,6 +374,7 @@ const {
   EditorView,
   minimalSetup,
   EditorState,
+  EditorSelection,
   Annotation,
   lineNumbers,
   highlightActiveLineGutter,
@@ -319,7 +388,7 @@ const {
   bracketMatching,
   indentOnInput,
   highlightSelectionMatches,
-  selectNextOccurrence,
+  SearchCursor,
   closeBrackets,
   closeBracketsKeymap,
   tags,
@@ -368,14 +437,12 @@ if (config.highlight_active_line) {
   extensions.push(highlightActiveLine());
 }
 if (config.highlight_selection_matches) {
-  // Highlight other occurrences of the current word/selection, and bind
-  // `Mod-d` to extend the selection to the next occurrence (as in `basicSetup`'s
-  // search keymap, which `minimalSetup` omits).
+  // Highlight other occurrences of the current word/selection, and bind `Mod-d`
+  // to extend the selection to the next occurrence. `selectNextMatch` matches
+  // substrings, unlike the search keymap's `selectNextOccurrence`.
   extensions.push(
     highlightSelectionMatches(),
-    keymap.of([
-      { key: "Mod-d", run: selectNextOccurrence, preventDefault: true },
-    ]),
+    keymap.of([{ key: "Mod-d", run: selectNextMatch, preventDefault: true }]),
   );
 }
 if (config.bracket_matching) {

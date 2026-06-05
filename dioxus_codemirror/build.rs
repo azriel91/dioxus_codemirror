@@ -189,7 +189,9 @@ fn index_js_render(languages_enabled: &[&LanguageManifest]) -> String {
          // features. Do not edit; change the features in Cargo.toml instead.\n",
     );
     index_js.push_str("export { EditorView, minimalSetup } from \"./codemirror.js\";\n");
-    index_js.push_str("export { EditorState, Annotation } from \"./codemirror__state.js\";\n");
+    index_js.push_str(
+        "export { EditorState, EditorSelection, Annotation } from \"./codemirror__state.js\";\n",
+    );
     index_js.push_str(
         "export { lineNumbers, highlightActiveLineGutter, highlightActiveLine, \
          highlightWhitespace, rectangularSelection, crosshairCursor, keymap } \
@@ -200,7 +202,7 @@ fn index_js_render(languages_enabled: &[&LanguageManifest]) -> String {
          from \"./codemirror__language.js\";\n",
     );
     index_js.push_str(
-        "export { highlightSelectionMatches, selectNextOccurrence } \
+        "export { highlightSelectionMatches, SearchCursor } \
          from \"./codemirror__search.js\";\n",
     );
     index_js.push_str(
