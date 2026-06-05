@@ -64,8 +64,8 @@ use dioxus_codemirror::CodeMirror;
 rsx! {
     CodeMirror {
         value,
-        allow_multiple_selections: true,   // Alt-click for multiple cursors
-        highlight_selection_matches: true, // highlight + Mod-d select next match
+        allow_multiple_selections: true,   // Alt-click, Mod-d / Mod-F2 cursors
+        highlight_selection_matches: true, // highlight other occurrences
         bracket_matching: true,
         close_brackets: true,
         line_wrapping: true,
@@ -75,8 +75,8 @@ rsx! {
 
 | Prop | CodeMirror extension |
 | --- | --- |
-| `allow_multiple_selections: bool` | `EditorState.allowMultipleSelections` |
-| `highlight_selection_matches: bool` | `highlightSelectionMatches`, plus `Mod-d` to select the next match and `Mod-F2` to select all matches (`Mod` = Cmd on macOS, Ctrl elsewhere; substring matches included; needs `allow_multiple_selections`) |
+| `allow_multiple_selections: bool` | `EditorState.allowMultipleSelections`; also binds `Mod-d` to select the next match and `Mod-F2` to select all matches (`Mod` = Cmd on macOS, Ctrl elsewhere; substring matches included) |
+| `highlight_selection_matches: bool` | `highlightSelectionMatches` (visual highlight only) |
 | `highlight_active_line: bool` | `highlightActiveLine` |
 | `bracket_matching: bool` | `bracketMatching` |
 | `close_brackets: bool` | `closeBrackets` |

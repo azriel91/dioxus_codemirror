@@ -468,24 +468,26 @@ if (config.line_numbers) {
 // includes `drawSelection` and the default keymap, so multiple selections only
 // need the facet and added keymaps layer on top of the defaults.
 if (config.allow_multiple_selections) {
-  extensions.push(EditorState.allowMultipleSelections.of(true));
-}
-if (config.highlight_active_line) {
-  extensions.push(highlightActiveLine());
-}
-if (config.highlight_selection_matches) {
-  // Highlight other occurrences of the current word/selection, and bind `Mod-d`
-  // to extend the selection to the next occurrence and `Mod-F2` to select all
-  // occurrences (`Mod` is Cmd on macOS, Ctrl elsewhere). Both match substrings
-  // (unlike the search keymap's `selectNextOccurrence`) and need
-  // `allow_multiple_selections` to add cursors.
+  // Enable the facet, then bind `Mod-d` to add the next occurrence of the
+  // selection and `Mod-F2` to add all occurrences (`Mod` is Cmd on macOS, Ctrl
+  // elsewhere). Both match substrings, unlike the search keymap's
+  // `selectNextOccurrence`. These produce extra cursors, so they belong with the
+  // facet rather than with `highlightSelectionMatches` (which is visual only).
   extensions.push(
-    highlightSelectionMatches(),
+    EditorState.allowMultipleSelections.of(true),
     keymap.of([
       { key: "Mod-d", run: selectNextMatch, preventDefault: true },
       { key: "Mod-F2", run: selectAllMatches, preventDefault: true },
     ]),
   );
+}
+if (config.highlight_active_line) {
+  extensions.push(highlightActiveLine());
+}
+if (config.highlight_selection_matches) {
+  // Highlight other occurrences of the current word/selection (visual only;
+  // the match-selecting keymaps live under `allow_multiple_selections`).
+  extensions.push(highlightSelectionMatches());
 }
 if (config.bracket_matching) {
   extensions.push(bracketMatching());

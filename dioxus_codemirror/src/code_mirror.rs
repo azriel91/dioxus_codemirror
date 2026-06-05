@@ -36,14 +36,17 @@ pub struct CodeMirrorProps {
     /// text (`None`).
     #[props(default)]
     pub language: Option<Language>,
-    /// Allow multiple selections / cursors (e.g. via `Alt`-click), mapping to
-    /// `EditorState.allowMultipleSelections`. Defaults to `false`.
+    /// Allow multiple selections / cursors, mapping to
+    /// `EditorState.allowMultipleSelections`. As well as `Alt`-click, this binds
+    /// `Mod-d` to add the next occurrence of the selection and `Mod-F2` to add
+    /// all occurrences (`Mod` is Cmd on macOS, Ctrl elsewhere; both match
+    /// substrings). Defaults to `false`.
     #[props(default)]
     pub allow_multiple_selections: bool,
-    /// Highlight other occurrences of the current word/selection, and bind
-    /// `Mod-d` to select the next occurrence -- mapping to
-    /// `highlightSelectionMatches` plus the `selectNextOccurrence` command.
-    /// Defaults to `false`.
+    /// Highlight other occurrences of the current word/selection, mapping to
+    /// `highlightSelectionMatches`. This is visual only; the match-selecting
+    /// keybindings live under [`Self::allow_multiple_selections`]. Defaults to
+    /// `false`.
     #[props(default)]
     pub highlight_selection_matches: bool,
     /// Highlight the line the primary cursor is on, mapping to
