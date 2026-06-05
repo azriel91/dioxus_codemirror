@@ -93,9 +93,10 @@ const THEME_PALETTE = [
   { name: "bg", light: "#ffffff", dark: "#0d1117" },
   { name: "fg", light: "#1f2328", dark: "#e6edf3" },
   { name: "caret", light: "#1f2328", dark: "#e6edf3" },
-  { name: "selection", light: "#d9d9d9", dark: "#2d333b" },
-  { name: "selection-focused", light: "#c5dbff", dark: "#2f4b73" },
+  { name: "selection", light: "#c7d2e0", dark: "#3a4250" },
+  { name: "selection-focused", light: "#9ec2ff", dark: "#3a619c" },
   { name: "selection-match", light: "#ffd33d55", dark: "#d2992255" },
+  { name: "selection-match-main", light: "#ffd33d99", dark: "#d2992299" },
   { name: "gutter-bg", light: "#f6f8fa", dark: "#0d1117" },
   { name: "gutter-fg", light: "#8c959f", dark: "#6e7681" },
   { name: "active-line", light: "#f0f3f6", dark: "#161b22" },
@@ -194,10 +195,15 @@ ${themeActivate("dark")}
   background: var(--dxcm-selection-focused);
 }
 /* Occurrences of the selected text, marked by \`selectionMatchHighlighter\` and
-   themed so they track the color scheme. The selected range is marked too, so it
-   shows this tint layered over its selection background. */
+   themed so they track the color scheme. Other occurrences get the match tint;
+   the actively selected occurrence (\`-main\`) is left to its (more prominent)
+   selection background instead, so it reads as the selection rather than as a
+   match. */
 .dioxus-codemirror .cm-selectionMatch {
   background: var(--dxcm-selection-match);
+}
+.dioxus-codemirror .cm-selectionMatch.cm-selectionMatch-main {
+  background: var(--dxcm-selection-match-main);
 }
 .dioxus-codemirror .cm-gutters {
   background: var(--dxcm-gutter-bg);
@@ -418,7 +424,13 @@ function selectAllMatches(view) {
 // out entirely once there is more than one selection. A bare cursor (no
 // selection) highlights nothing -- only an explicit selection does.
 function selectionMatchHighlighter() {
+  // Other occurrences get `cm-selectionMatch`; an occurrence that coincides with
+  // a selection range also gets `cm-selectionMatch-main`, so the actively
+  // selected match can be styled apart from the rest.
   const matchDeco = Decoration.mark({ class: "cm-selectionMatch" });
+  const mainDeco = Decoration.mark({
+    class: "cm-selectionMatch cm-selectionMatch-main",
+  });
   const compute = (view) => {
     const { state } = view;
     const main = state.selection.main;
@@ -430,11 +442,20 @@ function selectionMatchHighlighter() {
     if (!term.trim() || term.length > 200 || term.includes("\n")) {
       return Decoration.none;
     }
+    // Occurrences coinciding with a (non-empty) selection range are "main".
+    const selected = new Set();
+    for (const range of state.selection.ranges) {
+      if (!range.empty) {
+        selected.add(`${range.from}:${range.to}`);
+      }
+    }
     const ranges = [];
     for (const visible of view.visibleRanges) {
       const cursor = new SearchCursor(state.doc, term, visible.from, visible.to);
       while (!cursor.next().done) {
-        ranges.push(matchDeco.range(cursor.value.from, cursor.value.to));
+        const { from, to } = cursor.value;
+        const deco = selected.has(`${from}:${to}`) ? mainDeco : matchDeco;
+        ranges.push(deco.range(from, to));
       }
     }
     return ranges.length ? Decoration.set(ranges, true) : Decoration.none;
