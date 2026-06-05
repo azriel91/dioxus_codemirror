@@ -123,16 +123,15 @@ const THEME_PALETTE = [
 // `--dxcm-light-<name>: <light>; --dxcm-dark-<name>: <dark>;` for every entry --
 // both palettes declared once.
 const themePaletteSource = THEME_PALETTE.map(
-  ({ name, light, dark }) =>
-    `  --dxcm-light-${name}: ${light};\n  --dxcm-dark-${name}: ${dark};`,
+  ({ name, light, dark }) => `  --dxcm-light-${name}: ${light};\n  --dxcm-dark-${name}: ${dark};`,
 ).join("\n");
 
 // `--dxcm-<name>: var(--dxcm-<scheme>-<name>);` for every entry -- points the
 // active variables at the chosen scheme's sources, with no color duplicated.
 function themeActivate(scheme) {
-  return THEME_PALETTE.map(
-    ({ name }) => `  --dxcm-${name}: var(--dxcm-${scheme}-${name});`,
-  ).join("\n");
+  return THEME_PALETTE.map(({ name }) => `  --dxcm-${name}: var(--dxcm-${scheme}-${name});`).join(
+    "\n",
+  );
 }
 
 // Inject the editor chrome stylesheet once. Colors come from the active
@@ -266,7 +265,15 @@ function themeHighlightStyle() {
       color: "var(--dxcm-syntax-constant)",
     },
     {
-      tag: [tags.typeName, tags.className, tags.namespace, tags.changed, tags.annotation, tags.modifier, tags.self],
+      tag: [
+        tags.typeName,
+        tags.className,
+        tags.namespace,
+        tags.changed,
+        tags.annotation,
+        tags.modifier,
+        tags.self,
+      ],
       color: "var(--dxcm-syntax-type)",
     },
     {
@@ -274,7 +281,13 @@ function themeHighlightStyle() {
       color: "var(--dxcm-syntax-number)",
     },
     {
-      tag: [tags.operator, tags.operatorKeyword, tags.escape, tags.regexp, tags.special(tags.string)],
+      tag: [
+        tags.operator,
+        tags.operatorKeyword,
+        tags.escape,
+        tags.regexp,
+        tags.special(tags.string),
+      ],
       color: "var(--dxcm-syntax-operator)",
     },
     {
@@ -318,9 +331,7 @@ function selectNextMatch(view) {
     view.dispatch({
       selection: EditorSelection.create(
         selection.ranges.map((range, index) =>
-          index === selection.mainIndex
-            ? EditorSelection.range(word.from, word.to)
-            : range,
+          index === selection.mainIndex ? EditorSelection.range(word.from, word.to) : range,
         ),
         selection.mainIndex,
       ),
