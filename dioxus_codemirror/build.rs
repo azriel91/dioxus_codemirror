@@ -194,17 +194,15 @@ fn index_js_render(languages_enabled: &[&LanguageManifest]) -> String {
     );
     index_js.push_str(
         "export { lineNumbers, highlightActiveLineGutter, highlightActiveLine, \
-         highlightWhitespace, rectangularSelection, crosshairCursor, keymap } \
+         highlightWhitespace, rectangularSelection, crosshairCursor, keymap, \
+         Decoration, ViewPlugin } \
          from \"./codemirror__view.js\";\n",
     );
     index_js.push_str(
         "export { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } \
          from \"./codemirror__language.js\";\n",
     );
-    index_js.push_str(
-        "export { highlightSelectionMatches, SearchCursor } \
-         from \"./codemirror__search.js\";\n",
-    );
+    index_js.push_str("export { SearchCursor } from \"./codemirror__search.js\";\n");
     index_js.push_str(
         "export { closeBrackets, closeBracketsKeymap } from \"./codemirror__autocomplete.js\";\n",
     );

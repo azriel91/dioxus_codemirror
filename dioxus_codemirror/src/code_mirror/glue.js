@@ -193,15 +193,11 @@ ${themeActivate("dark")}
 .dioxus-codemirror .cm-focused .cm-selectionBackground {
   background: var(--dxcm-selection-focused);
 }
-/* Other occurrences of the current selection (\`highlightSelectionMatches\`),
-   themed so they track the color scheme. The match coinciding with the active
-   selection (\`-main\`) is left transparent so the selection's own background
-   (drawn by \`drawSelection\`) shows through instead of this highlight. */
+/* Occurrences of the selected text, marked by \`selectionMatchHighlighter\` and
+   themed so they track the color scheme. The selected range is marked too, so it
+   shows this tint layered over its selection background. */
 .dioxus-codemirror .cm-selectionMatch {
   background: var(--dxcm-selection-match);
-}
-.dioxus-codemirror .cm-selectionMatch.cm-selectionMatch-main {
-  background: transparent;
 }
 .dioxus-codemirror .cm-gutters {
   background: var(--dxcm-gutter-bg);
@@ -415,6 +411,49 @@ function selectAllMatches(view) {
   return true;
 }
 
+// View plugin that marks every visible occurrence of the actively selected text
+// with the `cm-selectionMatch` class -- the selected range included. This is
+// used instead of CodeMirror's `highlightSelectionMatches`, which never marks
+// the selection's own range (so the selected word loses its highlight) and bails
+// out entirely once there is more than one selection. A bare cursor (no
+// selection) highlights nothing -- only an explicit selection does.
+function selectionMatchHighlighter() {
+  const matchDeco = Decoration.mark({ class: "cm-selectionMatch" });
+  const compute = (view) => {
+    const { state } = view;
+    const main = state.selection.main;
+    if (main.empty) {
+      return Decoration.none;
+    }
+    const term = state.sliceDoc(main.from, main.to);
+    // Skip whitespace-only, over-long, or multi-line selections.
+    if (!term.trim() || term.length > 200 || term.includes("\n")) {
+      return Decoration.none;
+    }
+    const ranges = [];
+    for (const visible of view.visibleRanges) {
+      const cursor = new SearchCursor(state.doc, term, visible.from, visible.to);
+      while (!cursor.next().done) {
+        ranges.push(matchDeco.range(cursor.value.from, cursor.value.to));
+      }
+    }
+    return ranges.length ? Decoration.set(ranges, true) : Decoration.none;
+  };
+  return ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.decorations = compute(view);
+      }
+      update(update) {
+        if (update.selectionSet || update.docChanged || update.viewportChanged) {
+          this.decorations = compute(update.view);
+        }
+      }
+    },
+    { decorations: (plugin) => plugin.decorations },
+  );
+}
+
 // The first message from Rust is always the init config.
 const config = await dioxus.recv();
 
@@ -431,11 +470,12 @@ const {
   rectangularSelection,
   crosshairCursor,
   keymap,
+  Decoration,
+  ViewPlugin,
   HighlightStyle,
   syntaxHighlighting,
   bracketMatching,
   indentOnInput,
-  highlightSelectionMatches,
   SearchCursor,
   closeBrackets,
   closeBracketsKeymap,
@@ -496,9 +536,10 @@ if (config.highlight_active_line) {
   extensions.push(highlightActiveLine());
 }
 if (config.highlight_selection_matches) {
-  // Highlight other occurrences of the current word/selection (visual only;
-  // the match-selecting keymaps live under `allow_multiple_selections`).
-  extensions.push(highlightSelectionMatches());
+  // Highlight all occurrences of the selected text, the selection included
+  // (visual only; the match-selecting keymaps live under
+  // `allow_multiple_selections`).
+  extensions.push(selectionMatchHighlighter());
 }
 if (config.bracket_matching) {
   extensions.push(bracketMatching());

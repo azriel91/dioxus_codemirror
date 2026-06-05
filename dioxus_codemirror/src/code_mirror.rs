@@ -43,10 +43,12 @@ pub struct CodeMirrorProps {
     /// substrings). Defaults to `false`.
     #[props(default)]
     pub allow_multiple_selections: bool,
-    /// Highlight other occurrences of the current word/selection, mapping to
-    /// `highlightSelectionMatches`. This is visual only; the match-selecting
-    /// keybindings live under [`Self::allow_multiple_selections`]. Defaults to
-    /// `false`.
+    /// Highlight every occurrence of the selected text, the selected range
+    /// included. Unlike CodeMirror's `highlightSelectionMatches`, the active
+    /// selection itself is highlighted and the highlight survives multiple
+    /// selections; a bare cursor (no selection) highlights nothing. Visual only;
+    /// the match-selecting keybindings live under
+    /// [`Self::allow_multiple_selections`]. Defaults to `false`.
     #[props(default)]
     pub highlight_selection_matches: bool,
     /// Highlight the line the primary cursor is on, mapping to
