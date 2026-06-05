@@ -187,11 +187,18 @@ ${themeActivate("dark")}
 .dioxus-codemirror .cm-dropCursor {
   border-left-color: var(--dxcm-caret);
 }
-.dioxus-codemirror .cm-selectionBackground,
+/* Selection background, drawn by \`drawSelection\` as \`.cm-selectionBackground\`
+   layers. CodeMirror's base theme styles these with high-specificity selectors
+   (\`&light.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground\`,
+   ~5 classes) and keys light/dark off its own \`darkTheme\` facet -- which we do
+   not set, so it would always apply its light colors regardless of our scheme.
+   We therefore match its structure (and add \`.cm-editor\` to outweigh it) so our
+   variables win in both focus states and both schemes. */
+.dioxus-codemirror .cm-selectionLayer .cm-selectionBackground,
 .dioxus-codemirror .cm-content ::selection {
   background: var(--dxcm-selection);
 }
-.dioxus-codemirror .cm-focused .cm-selectionBackground {
+.dioxus-codemirror .cm-editor.cm-focused .cm-scroller .cm-selectionLayer .cm-selectionBackground {
   background: var(--dxcm-selection-focused);
 }
 /* Occurrences of the selected text, marked by \`selectionMatchHighlighter\` and
