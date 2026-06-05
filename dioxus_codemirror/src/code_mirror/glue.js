@@ -367,6 +367,43 @@ function selectNextMatchFind(state, query, ranges) {
   return scan(after, state.doc.length) ?? scan(0, after);
 }
 
+// `Mod-F2` command: select every occurrence of the current selection (or the
+// word under a bare cursor) at once, substring matches included. Requires
+// `allow_multiple_selections`.
+function selectAllMatches(view) {
+  const { state } = view;
+  const main = state.selection.main;
+
+  // The term to match: the selected text, or the word under a bare cursor.
+  let term;
+  if (main.empty) {
+    const word = state.wordAt(main.head);
+    term = word && state.sliceDoc(word.from, word.to);
+  } else {
+    term = state.sliceDoc(main.from, main.to);
+  }
+  if (!term) {
+    return false;
+  }
+
+  const ranges = [];
+  const cursor = new SearchCursor(state.doc, term);
+  while (!cursor.next().done) {
+    ranges.push(EditorSelection.range(cursor.value.from, cursor.value.to));
+  }
+  if (ranges.length === 0) {
+    return false;
+  }
+
+  // Keep the caret on the first match at or after the original selection.
+  const mainIndex = ranges.findIndex((range) => range.from >= main.from);
+  view.dispatch({
+    selection: EditorSelection.create(ranges, mainIndex < 0 ? 0 : mainIndex),
+    scrollIntoView: true,
+  });
+  return true;
+}
+
 // The first message from Rust is always the init config.
 const config = await dioxus.recv();
 
@@ -438,11 +475,16 @@ if (config.highlight_active_line) {
 }
 if (config.highlight_selection_matches) {
   // Highlight other occurrences of the current word/selection, and bind `Mod-d`
-  // to extend the selection to the next occurrence. `selectNextMatch` matches
-  // substrings, unlike the search keymap's `selectNextOccurrence`.
+  // to extend the selection to the next occurrence and `Mod-F2` to select all
+  // occurrences (`Mod` is Cmd on macOS, Ctrl elsewhere). Both match substrings
+  // (unlike the search keymap's `selectNextOccurrence`) and need
+  // `allow_multiple_selections` to add cursors.
   extensions.push(
     highlightSelectionMatches(),
-    keymap.of([{ key: "Mod-d", run: selectNextMatch, preventDefault: true }]),
+    keymap.of([
+      { key: "Mod-d", run: selectNextMatch, preventDefault: true },
+      { key: "Mod-F2", run: selectAllMatches, preventDefault: true },
+    ]),
   );
 }
 if (config.bracket_matching) {

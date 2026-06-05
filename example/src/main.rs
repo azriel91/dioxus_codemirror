@@ -70,9 +70,10 @@ fn App() -> Element {
             h2 { "1. Plain editable text + features" }
             p {
                 "No line numbers, no language. Several CodeMirror features are on: "
-                "Alt-click for multiple cursors, Mod-d to select the next match of "
-                "the current word, matching-bracket highlighting, auto-closing "
-                "brackets, and line wrapping."
+                "Alt-click for multiple cursors, Ctrl/Cmd-d to select the next match "
+                "of the current word and Ctrl/Cmd-F2 to select all matches, "
+                "matching-bracket highlighting, auto-closing brackets, and line "
+                "wrapping."
             }
             CodeMirror {
                 value: value_plain,

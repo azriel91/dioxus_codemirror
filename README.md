@@ -76,7 +76,7 @@ rsx! {
 | Prop | CodeMirror extension |
 | --- | --- |
 | `allow_multiple_selections: bool` | `EditorState.allowMultipleSelections` |
-| `highlight_selection_matches: bool` | `highlightSelectionMatches` + `selectNextOccurrence` (`Mod-d`) |
+| `highlight_selection_matches: bool` | `highlightSelectionMatches`, plus `Mod-d` to select the next match and `Mod-F2` to select all matches (`Mod` = Cmd on macOS, Ctrl elsewhere; substring matches included; needs `allow_multiple_selections`) |
 | `highlight_active_line: bool` | `highlightActiveLine` |
 | `bracket_matching: bool` | `bracketMatching` |
 | `close_brackets: bool` | `closeBrackets` |
