@@ -95,6 +95,7 @@ const THEME_PALETTE = [
   { name: "caret", light: "#1f2328", dark: "#e6edf3" },
   { name: "selection", light: "#d9d9d9", dark: "#2d333b" },
   { name: "selection-focused", light: "#c5dbff", dark: "#2f4b73" },
+  { name: "selection-match", light: "#ffd33d55", dark: "#d2992255" },
   { name: "gutter-bg", light: "#f6f8fa", dark: "#0d1117" },
   { name: "gutter-fg", light: "#8c959f", dark: "#6e7681" },
   { name: "active-line", light: "#f0f3f6", dark: "#161b22" },
@@ -192,6 +193,16 @@ ${themeActivate("dark")}
 }
 .dioxus-codemirror .cm-focused .cm-selectionBackground {
   background: var(--dxcm-selection-focused);
+}
+/* Other occurrences of the current selection (\`highlightSelectionMatches\`),
+   themed so they track the color scheme. The match coinciding with the active
+   selection (\`-main\`) is left transparent so the selection's own background
+   (drawn by \`drawSelection\`) shows through instead of this highlight. */
+.dioxus-codemirror .cm-selectionMatch {
+  background: var(--dxcm-selection-match);
+}
+.dioxus-codemirror .cm-selectionMatch.cm-selectionMatch-main {
+  background: transparent;
 }
 .dioxus-codemirror .cm-gutters {
   background: var(--dxcm-gutter-bg);
