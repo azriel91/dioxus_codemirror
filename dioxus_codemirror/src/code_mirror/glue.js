@@ -449,11 +449,7 @@ function selectionMatchHighlighter() {
       return Decoration.none;
     }
     const term = state.sliceDoc(main.from, main.to);
-    // Skip whitespace-only, over-long, or multi-line selections.
-    if (!term.trim() || term.length > 200 || term.includes("\n")) {
-      return Decoration.none;
-    }
-    // Occurrences coinciding with a (non-empty) selection range are "main".
+    // Occurrences coinciding with a selection range are "main".
     const selected = new Set();
     for (const range of state.selection.ranges) {
       if (!range.empty) {
