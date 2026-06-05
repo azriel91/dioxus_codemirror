@@ -99,6 +99,7 @@ const THEME_PALETTE = [
   { name: "selection-match-main", light: "#ffd33d99", dark: "#d2992299" },
   { name: "gutter-bg", light: "#f6f8fa", dark: "#0d1117" },
   { name: "gutter-fg", light: "#8c959f", dark: "#6e7681" },
+  { name: "highlight-space", light: "#d0d3d6", dark: "#363b42" },
   { name: "active-line", light: "#f0f3f6", dark: "#161b22" },
   { name: "active-line-gutter-bg", light: "#eaeef2", dark: "#161b22" },
   { name: "border", light: "#d0d7de", dark: "#30363d" },
@@ -197,6 +198,9 @@ ${themeActivate("dark")}
 .dioxus-codemirror .cm-selectionLayer .cm-selectionBackground,
 .dioxus-codemirror .cm-content ::selection {
   background: var(--dxcm-selection);
+}
+.dioxus-codemirror .cm-editor .cm-scroller .cm-highlightSpace {
+  background-image: radial-gradient(circle at 50% 55%, var(--dxcm-highlight-space) 20%, transparent 5%);
 }
 .dioxus-codemirror .cm-editor.cm-focused .cm-scroller .cm-selectionLayer .cm-selectionBackground {
   background: var(--dxcm-selection-focused);
