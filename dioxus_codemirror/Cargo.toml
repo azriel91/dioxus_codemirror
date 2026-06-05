@@ -7,9 +7,7 @@ repository.workspace = true
 description = "A Dioxus web component that wraps the CodeMirror 6 editor."
 
 [features]
-# Default to the languages the component historically shipped, so existing
-# consumers keep YAML and Markdown highlighting without opting in.
-default = ["lang-yaml", "lang-markdown"]
+default = []
 # Each `lang-*` feature bundles one CodeMirror language. `build.rs` copies only
 # the files for the enabled languages into the served asset folder, so disabled
 # languages are never shipped to `dist`. Enable extras with, e.g.

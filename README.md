@@ -169,11 +169,10 @@ are never copied into the build output. Enable the ones you need:
 
 ```toml
 [dependencies]
-# Defaults to ["lang-yaml", "lang-markdown"].
 dioxus_codemirror = "..."
 
-# Or pick your own set:
-dioxus_codemirror = { version = "...", default-features = false, features = [
+# Select which language syntax highlighting you want to bundle.
+dioxus_codemirror = { version = "...", features = [
     "lang-css",
     "lang-html",
 ] }
