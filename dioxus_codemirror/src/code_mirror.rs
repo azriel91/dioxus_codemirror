@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use dioxus::{
-    document::{Eval, eval},
+    document::{eval, Eval},
     prelude::*,
 };
 use futures::StreamExt;
@@ -37,17 +37,17 @@ pub struct CodeMirrorProps {
     #[props(default)]
     pub language: Option<Language>,
     /// Allow multiple selections / cursors, mapping to
-    /// `EditorState.allowMultipleSelections`. As well as `Alt`-click, this binds
-    /// `Mod-d` to add the next occurrence of the selection and `Mod-F2` to add
-    /// all occurrences (`Mod` is Cmd on macOS, Ctrl elsewhere; both match
-    /// substrings). Defaults to `false`.
+    /// `EditorState.allowMultipleSelections`. As well as `Alt`-click, this
+    /// binds `Mod-d` to add the next occurrence of the selection and
+    /// `Mod-F2` to add all occurrences (`Mod` is Cmd on macOS, Ctrl
+    /// elsewhere; both match substrings). Defaults to `false`.
     #[props(default)]
     pub allow_multiple_selections: bool,
     /// Highlight every occurrence of the selected text, the selected range
     /// included. Unlike CodeMirror's `highlightSelectionMatches`, the active
     /// selection itself is highlighted and the highlight survives multiple
-    /// selections; a bare cursor (no selection) highlights nothing. Visual only;
-    /// the match-selecting keybindings live under
+    /// selections; a bare cursor (no selection) highlights nothing. Visual
+    /// only; the match-selecting keybindings live under
     /// [`Self::allow_multiple_selections`]. Defaults to `false`.
     #[props(default)]
     pub highlight_selection_matches: bool,
@@ -79,9 +79,10 @@ pub struct CodeMirrorProps {
     /// `EditorView.lineWrapping`. Defaults to `false`.
     #[props(default)]
     pub line_wrapping: bool,
-    /// Bind `Tab`/`Shift-Tab` to indent, mapping to `keymap.of([indentWithTab])`
-    /// so `Tab` inserts indentation rather than moving focus out of the editor.
-    /// Defaults to `false`, keeping `Tab` as a focus escape for accessibility.
+    /// Bind `Tab`/`Shift-Tab` to indent, mapping to
+    /// `keymap.of([indentWithTab])` so `Tab` inserts indentation rather
+    /// than moving focus out of the editor. Defaults to `false`, keeping
+    /// `Tab` as a focus escape for accessibility.
     #[props(default)]
     pub indent_with_tab: bool,
     /// Make the document read-only, mapping to `EditorState.readOnly`. Defaults
@@ -134,7 +135,10 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
     } = props;
 
     let mount_id = use_hook(|| {
-        format!("cm-editor-{}", EDITOR_ID_NEXT.fetch_add(1, Ordering::Relaxed))
+        format!(
+            "cm-editor-{}",
+            EDITOR_ID_NEXT.fetch_add(1, Ordering::Relaxed)
+        )
     });
 
     // The glue script's evaluator handle, shared with the doc-set effect once
@@ -220,8 +224,9 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
     use_future(move || {
         let lsp_push = lsp_push.clone();
         async move {
-            let Some(mut messages_pushed_rx) =
-                lsp_push.as_ref().and_then(LspBridge::messages_pushed_rx_take)
+            let Some(mut messages_pushed_rx) = lsp_push
+                .as_ref()
+                .and_then(LspBridge::messages_pushed_rx_take)
             else {
                 return;
             };

@@ -53,9 +53,8 @@ struct LanguageManifest {
 }
 
 fn main() {
-    let manifest_dir = PathBuf::from(
-        env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo"),
-    );
+    let manifest_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo"));
     let vendor_dir = manifest_dir.join(VENDOR_DIR);
     let gen_dir = manifest_dir.join(GEN_DIR);
     let marker_path = manifest_dir.join(MARKER);
@@ -69,8 +68,8 @@ fn main() {
     // actually changes (see the marker check), so unchanged builds are cheap and
     // do not churn asset hashes. Re-running is forced by depending on a stamp
     // file we rewrite with a fresh value each run.
-    let stamp_path = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR is set"))
-        .join("dxcm-rerun-stamp");
+    let stamp_path =
+        PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR is set")).join("dxcm-rerun-stamp");
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|elapsed| elapsed.as_nanos())
@@ -89,8 +88,7 @@ fn main() {
         .collect();
 
     // Files to serve = core closure union the enabled languages' closures.
-    let mut file_stems: BTreeSet<&str> =
-        manifest.core.iter().map(String::as_str).collect();
+    let mut file_stems: BTreeSet<&str> = manifest.core.iter().map(String::as_str).collect();
     for language in &languages_enabled {
         for file_stem in &language.files {
             file_stems.insert(file_stem.as_str());
@@ -154,12 +152,7 @@ fn feature_is_enabled(feature: &str) -> bool {
 
 /// Recreates `gen_dir`, copies the selected files from `vendor_dir`, and writes
 /// the generated `index.js`.
-fn gen_dir_write(
-    vendor_dir: &Path,
-    gen_dir: &Path,
-    file_stems: &BTreeSet<&str>,
-    index_js: &str,
-) {
+fn gen_dir_write(vendor_dir: &Path, gen_dir: &Path, file_stems: &BTreeSet<&str>, index_js: &str) {
     if gen_dir.exists() {
         fs::remove_dir_all(gen_dir)
             .unwrap_or_else(|error| panic!("remove {}: {error}", gen_dir.display()));
@@ -171,9 +164,8 @@ fn gen_dir_write(
         let file_name = format!("{file_stem}.js");
         let src = vendor_dir.join(&file_name);
         let dst = gen_dir.join(&file_name);
-        fs::copy(&src, &dst).unwrap_or_else(|error| {
-            panic!("copy {} -> {}: {error}", src.display(), dst.display())
-        });
+        fs::copy(&src, &dst)
+            .unwrap_or_else(|error| panic!("copy {} -> {}: {error}", src.display(), dst.display()));
     }
 
     fs::write(gen_dir.join("index.js"), index_js)

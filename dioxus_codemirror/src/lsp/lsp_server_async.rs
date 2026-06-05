@@ -4,8 +4,8 @@ use crate::lsp::{lsp_message::LspMessage, lsp_pusher::LspPusher};
 ///
 /// This is the extension point for language servers whose work does *not*
 /// complete within the call that receives a message -- for example one that
-/// forwards requests to a Web Worker (or a real WASM server running off the main
-/// thread) and gets answers back later, or one that emits diagnostics
+/// forwards requests to a Web Worker (or a real WASM server running off the
+/// main thread) and gets answers back later, or one that emits diagnostics
 /// spontaneously after a processing step.
 ///
 /// Where the synchronous [`LspServer`] *returns* its replies, an
@@ -27,8 +27,8 @@ pub trait LspServerAsync {
     /// Hands the server an [`LspPusher`] to emit messages to the editor.
     ///
     /// Called once, before any [`lsp_message_handle`] call. Keep the pusher (it
-    /// is [`Clone`]) so later async work -- a worker reply, a diagnostics run --
-    /// can push onto it at any time.
+    /// is [`Clone`]) so later async work -- a worker reply, a diagnostics run
+    /// -- can push onto it at any time.
     ///
     /// [`lsp_message_handle`]: LspServerAsync::lsp_message_handle
     fn lsp_pusher_set(&mut self, pusher: LspPusher);

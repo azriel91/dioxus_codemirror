@@ -1,14 +1,14 @@
 use dioxus_codemirror::{LspMessage, LspPusher, LspServerAsync};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 /// A stand-in async language server that *pushes* its messages back.
 ///
 /// Unlike [`MockLspServer`], which returns its replies synchronously, this one
 /// holds an [`LspPusher`] and pushes everything onto it: request responses, and
-/// -- crucially -- unprompted `textDocument/publishDiagnostics` notifications it
-/// emits when the document opens or changes. That demonstrates the server-push
-/// path end to end, the same way a Web Worker-backed server (whose replies
-/// genuinely arrive later) would behave. Swap this out for a real WASM
+/// -- crucially -- unprompted `textDocument/publishDiagnostics` notifications
+/// it emits when the document opens or changes. That demonstrates the
+/// server-push path end to end, the same way a Web Worker-backed server (whose
+/// replies genuinely arrive later) would behave. Swap this out for a real WASM
 /// [`LspServerAsync`] to get genuine language features.
 ///
 /// [`MockLspServer`]: crate::mock_lsp_server::MockLspServer

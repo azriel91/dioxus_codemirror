@@ -16,13 +16,13 @@ use crate::lsp::{
 ///    forwarded straight back, within the component's message loop, so there is
 ///    no round-trip latency through the render cycle. Covers requests and
 ///    notifications, but not server-initiated messages.
-/// 2. **Async / worker-capable** -- [`LspBridge::lsp_bridge_from_server_async`].
-///    Messages from the editor are handed to the server fire-and-forget; the
-///    server pushes replies and unprompted messages (e.g.
-///    `textDocument/publishDiagnostics` diagnostics) back over a channel at any
-///    time, which the component drains into the editor. This is the path for a
-///    server running in a Web Worker, or one that emits diagnostics after a
-///    processing step.
+/// 2. **Async / worker-capable** --
+///    [`LspBridge::lsp_bridge_from_server_async`]. Messages from the editor are
+///    handed to the server fire-and-forget; the server pushes replies and
+///    unprompted messages (e.g. `textDocument/publishDiagnostics` diagnostics)
+///    back over a channel at any time, which the component drains into the
+///    editor. This is the path for a server running in a Web Worker, or one
+///    that emits diagnostics after a processing step.
 ///
 /// [`CodeMirror`]: crate::code_mirror::CodeMirror
 #[derive(Clone)]
@@ -30,17 +30,18 @@ pub struct LspBridge {
     /// File URI the LSP client operates on, e.g. `"file:///main.rs"`.
     pub uri: String,
     /// Handles a JSON-RPC message from the editor and returns the server's
-    /// synchronous reply messages (often empty -- e.g. for notifications, or for
-    /// an async server whose replies arrive later via [`messages_pushed_rx`]).
+    /// synchronous reply messages (often empty -- e.g. for notifications, or
+    /// for an async server whose replies arrive later via
+    /// [`messages_pushed_rx`]).
     ///
     /// [`messages_pushed_rx`]: LspBridge::messages_pushed_rx
     pub on_message_to_server: Callback<LspMessage, Vec<LspMessage>>,
     /// Receiver of server-pushed messages, drained once by the component.
     ///
     /// `Some` for an async bridge; `None` for a synchronous one (which has no
-    /// out-of-band push path). Wrapped in `Rc<RefCell<Option<_>>>` so the bridge
-    /// stays [`Clone`] (the receiver is not) while letting the component take the
-    /// receiver exactly once.
+    /// out-of-band push path). Wrapped in `Rc<RefCell<Option<_>>>` so the
+    /// bridge stays [`Clone`] (the receiver is not) while letting the
+    /// component take the receiver exactly once.
     messages_pushed_rx: Rc<RefCell<Option<LspMessageRx>>>,
 }
 
@@ -92,10 +93,10 @@ impl LspBridge {
     ///
     /// A push channel is created and its [`LspPusher`] handed to `server` once
     /// (via [`LspServerAsync::lsp_pusher_set`]); the component drains the
-    /// receiving end and forwards whatever the server pushes -- async replies and
-    /// server-initiated diagnostics alike -- to the editor. Messages from the
-    /// editor are delivered to the server fire-and-forget, so handling them never
-    /// blocks the component's message loop.
+    /// receiving end and forwards whatever the server pushes -- async replies
+    /// and server-initiated diagnostics alike -- to the editor. Messages
+    /// from the editor are delivered to the server fire-and-forget, so
+    /// handling them never blocks the component's message loop.
     ///
     /// `uri` is the file URI, e.g. `"file:///main.rs"`.
     ///
@@ -132,8 +133,8 @@ impl LspBridge {
     /// Takes the server-push receiver, leaving `None` behind.
     ///
     /// Returns `Some` at most once (on the first call for an async bridge),
-    /// `None` thereafter or for a synchronous bridge. The component calls this to
-    /// claim the receiver for its drain loop.
+    /// `None` thereafter or for a synchronous bridge. The component calls this
+    /// to claim the receiver for its drain loop.
     pub(crate) fn messages_pushed_rx_take(&self) -> Option<LspMessageRx> {
         self.messages_pushed_rx.borrow_mut().take()
     }
