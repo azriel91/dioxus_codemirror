@@ -31,7 +31,6 @@
 
 pub mod cmd;
 pub mod code_mirror;
-pub mod editor_features;
 pub mod evt;
 pub mod language;
 pub mod lsp;
@@ -40,7 +39,6 @@ pub mod theme;
 pub use crate::{
     cmd::Cmd,
     code_mirror::{CodeMirror, CodeMirrorProps},
-    editor_features::EditorFeatures,
     evt::Evt,
     language::Language,
     lsp::{LspBridge, LspMessage, LspMessageRx, LspPusher, LspServer, LspServerAsync},

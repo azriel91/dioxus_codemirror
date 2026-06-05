@@ -2,7 +2,7 @@ mod mock_lsp_server;
 mod mock_lsp_server_async;
 
 use dioxus::prelude::*;
-use dioxus_codemirror::{CodeMirror, EditorFeatures, Language, LspBridge, Theme};
+use dioxus_codemirror::{CodeMirror, Language, LspBridge, Theme};
 
 use crate::{mock_lsp_server::MockLspServer, mock_lsp_server_async::MockLspServerAsync};
 
@@ -76,13 +76,12 @@ fn App() -> Element {
             }
             CodeMirror {
                 value: value_plain,
-                features: EditorFeatures::default()
-                    .allow_multiple_selections()
-                    .highlight_selection_matches()
-                    .highlight_active_line()
-                    .bracket_matching()
-                    .close_brackets()
-                    .line_wrapping(),
+                allow_multiple_selections: true,
+                highlight_selection_matches: true,
+                highlight_active_line: true,
+                bracket_matching: true,
+                close_brackets: true,
+                line_wrapping: true,
             }
             pre { "{value_plain}" }
         }

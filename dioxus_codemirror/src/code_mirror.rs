@@ -8,7 +8,6 @@ use futures::StreamExt;
 
 use crate::{
     cmd::Cmd,
-    editor_features::EditorFeatures,
     evt::Evt,
     language::Language,
     lsp::{lsp_bridge::LspBridge, lsp_message::LspMessage},
@@ -37,11 +36,52 @@ pub struct CodeMirrorProps {
     /// text (`None`).
     #[props(default)]
     pub language: Option<Language>,
-    /// Optional CodeMirror features to enable, e.g.
-    /// `EditorFeatures::default().allow_multiple_selections()`. Defaults to all
-    /// off.
+    /// Allow multiple selections / cursors (e.g. via `Alt`-click), mapping to
+    /// `EditorState.allowMultipleSelections`. Defaults to `false`.
     #[props(default)]
-    pub features: EditorFeatures,
+    pub allow_multiple_selections: bool,
+    /// Highlight other occurrences of the current word/selection, and bind
+    /// `Mod-d` to select the next occurrence -- mapping to
+    /// `highlightSelectionMatches` plus the `selectNextOccurrence` command.
+    /// Defaults to `false`.
+    #[props(default)]
+    pub highlight_selection_matches: bool,
+    /// Highlight the line the primary cursor is on, mapping to
+    /// `highlightActiveLine`. Defaults to `false`.
+    #[props(default)]
+    pub highlight_active_line: bool,
+    /// Highlight the bracket matching the one next to the cursor, mapping to
+    /// `bracketMatching`. Defaults to `false`.
+    #[props(default)]
+    pub bracket_matching: bool,
+    /// Auto-insert closing brackets and quotes, mapping to `closeBrackets`.
+    /// Defaults to `false`.
+    #[props(default)]
+    pub close_brackets: bool,
+    /// Allow rectangular (block) selection via `Alt`-drag, mapping to
+    /// `rectangularSelection` plus `crosshairCursor`. Defaults to `false`.
+    #[props(default)]
+    pub rectangular_selection: bool,
+    /// Re-indent lines as you type, mapping to `indentOnInput`. Defaults to
+    /// `false`.
+    #[props(default)]
+    pub indent_on_input: bool,
+    /// Render whitespace characters visibly, mapping to `highlightWhitespace`.
+    /// Defaults to `false`.
+    #[props(default)]
+    pub highlight_whitespace: bool,
+    /// Wrap long lines instead of scrolling horizontally, mapping to
+    /// `EditorView.lineWrapping`. Defaults to `false`.
+    #[props(default)]
+    pub line_wrapping: bool,
+    /// Make the document read-only, mapping to `EditorState.readOnly`. Defaults
+    /// to `false`.
+    #[props(default)]
+    pub read_only: bool,
+    /// Width of a tab in spaces, mapping to `EditorState.tabSize`, e.g.
+    /// `Some(2)`. `None` (the default) keeps CodeMirror's default.
+    #[props(default)]
+    pub tab_size: Option<u8>,
     /// Color theme, e.g. `Theme::Dark`. Defaults to [`Theme::Auto`], which
     /// follows the operating system's `prefers-color-scheme`.
     #[props(default)]
@@ -66,7 +106,17 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
         mut value,
         line_numbers,
         language,
-        features,
+        allow_multiple_selections,
+        highlight_selection_matches,
+        highlight_active_line,
+        bracket_matching,
+        close_brackets,
+        rectangular_selection,
+        indent_on_input,
+        highlight_whitespace,
+        line_wrapping,
+        read_only,
+        tab_size,
         theme,
         lsp,
         on_ready,
@@ -98,7 +148,17 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                 doc: value.peek().clone(),
                 line_numbers,
                 language,
-                features,
+                allow_multiple_selections,
+                highlight_selection_matches,
+                highlight_active_line,
+                bracket_matching,
+                close_brackets,
+                rectangular_selection,
+                indent_on_input,
+                highlight_whitespace,
+                line_wrapping,
+                read_only,
+                tab_size,
                 lsp_uri: lsp.as_ref().map(|lsp| lsp.uri.clone()),
             };
             if evaluator.send(init).is_err() {
