@@ -18,14 +18,30 @@ pub enum Cmd {
     /// e.g. `"/assets/codemirror"`. `doc`: the initial document text.
     /// `line_numbers`: whether to show the line-number gutter. `language`:
     /// syntax highlighting language, e.g. `Some(Language::Yaml)`, or `None` for
-    /// plain text. `lsp_uri`: the file URI to attach the LSP client for, e.g.
-    /// `Some("file:///main.rs")`, or `None` to disable LSP.
+    /// plain text. The remaining flags toggle optional CodeMirror features (see
+    /// the matching [`CodeMirrorProps`] fields). `lsp_uri`: the file URI to
+    /// attach the LSP client for, e.g. `Some("file:///main.rs")`, or `None` to
+    /// disable LSP.
+    ///
+    /// [`CodeMirrorProps`]: crate::code_mirror::CodeMirrorProps
     Init {
         mount_id: String,
         cm_base: String,
         doc: String,
         line_numbers: bool,
         language: Option<Language>,
+        allow_multiple_selections: bool,
+        highlight_selection_matches: bool,
+        highlight_active_line: bool,
+        bracket_matching: bool,
+        close_brackets: bool,
+        rectangular_selection: bool,
+        indent_on_input: bool,
+        highlight_whitespace: bool,
+        line_wrapping: bool,
+        indent_with_tab: bool,
+        read_only: bool,
+        tab_size: Option<u8>,
         lsp_uri: Option<String>,
     },
     /// Replace the editor's document with `doc`, e.g. when the bound data

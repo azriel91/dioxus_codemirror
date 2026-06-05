@@ -67,9 +67,23 @@ fn App() -> Element {
         h1 { "dioxus_codemirror example" }
 
         section {
-            h2 { "1. Plain editable text" }
-            p { "No line numbers, no language. Type to edit; the text mirrors live below." }
-            CodeMirror { value: value_plain }
+            h2 { "1. Plain editable text + features" }
+            p {
+                "No line numbers, no language. Several CodeMirror features are on: "
+                "Alt-click for multiple cursors, Ctrl/Cmd-d to select the next match "
+                "of the current word and Ctrl/Cmd-F2 to select all matches, "
+                "matching-bracket highlighting, auto-closing brackets, and line "
+                "wrapping."
+            }
+            CodeMirror {
+                value: value_plain,
+                allow_multiple_selections: true,
+                highlight_selection_matches: true,
+                highlight_active_line: true,
+                bracket_matching: true,
+                close_brackets: true,
+                line_wrapping: true,
+            }
             pre { "{value_plain}" }
         }
 
@@ -87,6 +101,12 @@ fn App() -> Element {
             CodeMirror {
                 value: value_yaml,
                 line_numbers: true,
+                allow_multiple_selections: true,
+                highlight_selection_matches: true,
+                highlight_active_line: true,
+                bracket_matching: true,
+                close_brackets: true,
+                line_wrapping: true,
                 language: Language::Yaml,
                 theme: theme_yaml(),
             }

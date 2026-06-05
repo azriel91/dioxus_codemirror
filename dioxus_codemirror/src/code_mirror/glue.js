@@ -21,35 +21,26 @@
 // for them. The modules live in a Dioxus folder asset (`cm_base`) and are
 // refreshed with `cargo run -p xtask -- vendor`.
 
-// Module script that imports the vendored CodeMirror entry files (relative to
-// `base`) and exposes them on `window.__dxcm`. Importing the entries pulls in
-// their siblings, so the core `state`/`view` modules load exactly once and are
+// Module script that imports the vendored CodeMirror entry file (relative to
+// `base`) and exposes its exports on `window.__dxcm`. Importing the entry pulls
+// in its siblings, so the core `state`/`view` modules load exactly once and are
 // shared (CodeMirror requires a single instance of each).
 function codeMirrorLoaderScript(base) {
   // Import only the single entry. Dioxus bundles each vendored `.js` with
   // esbuild (inlining its imports), so importing several entry files would load
   // several copies of `@codemirror/state` and trip its "multiple instances"
   // check. One entry => one bundle => one shared `state` instance.
+  //
+  // The entry's exports vary with the consumer's enabled `lang-*` Cargo
+  // features (see `build.rs`): the core symbols are always present, and a
+  // `languages` map holds the bundled language factories keyed by name. Spread
+  // the whole namespace so this script needs no per-language edits.
   const indexUrl = JSON.stringify(`${base}/index.js`);
   return `
 (async () => {
   try {
     const cm = await import(${indexUrl});
-    window.__dxcm = {
-      EditorView: cm.EditorView,
-      minimalSetup: cm.minimalSetup,
-      EditorState: cm.EditorState,
-      Annotation: cm.Annotation,
-      lineNumbers: cm.lineNumbers,
-      highlightActiveLineGutter: cm.highlightActiveLineGutter,
-      HighlightStyle: cm.HighlightStyle,
-      syntaxHighlighting: cm.syntaxHighlighting,
-      tags: cm.tags,
-      yaml: cm.yaml,
-      markdown: cm.markdown,
-      LSPClient: cm.LSPClient,
-      languageServerExtensions: cm.languageServerExtensions,
-    };
+    window.__dxcm = { ...cm };
   } catch (error) {
     window.__dxcmError = String(error);
     console.error("dioxus_codemirror: failed to load vendored CodeMirror", error);
@@ -102,10 +93,13 @@ const THEME_PALETTE = [
   { name: "bg", light: "#ffffff", dark: "#0d1117" },
   { name: "fg", light: "#1f2328", dark: "#e6edf3" },
   { name: "caret", light: "#1f2328", dark: "#e6edf3" },
-  { name: "selection", light: "#d9d9d9", dark: "#2d333b" },
-  { name: "selection-focused", light: "#c5dbff", dark: "#2f4b73" },
+  { name: "selection", light: "#c7d2e0", dark: "#3a4250" },
+  { name: "selection-focused", light: "#9ec2ff", dark: "#3a619c" },
+  { name: "selection-match", light: "#3dd3ff55", dark: "#2299d255" },
+  { name: "selection-match-main", light: "#3dd3ff99", dark: "#2299d299" },
   { name: "gutter-bg", light: "#f6f8fa", dark: "#0d1117" },
   { name: "gutter-fg", light: "#8c959f", dark: "#6e7681" },
+  { name: "highlight-space", light: "#d0d3d6", dark: "#363b42" },
   { name: "active-line", light: "#f0f3f6", dark: "#161b22" },
   { name: "active-line-gutter-bg", light: "#eaeef2", dark: "#161b22" },
   { name: "border", light: "#d0d7de", dark: "#30363d" },
@@ -131,16 +125,15 @@ const THEME_PALETTE = [
 // `--dxcm-light-<name>: <light>; --dxcm-dark-<name>: <dark>;` for every entry --
 // both palettes declared once.
 const themePaletteSource = THEME_PALETTE.map(
-  ({ name, light, dark }) =>
-    `  --dxcm-light-${name}: ${light};\n  --dxcm-dark-${name}: ${dark};`,
+  ({ name, light, dark }) => `  --dxcm-light-${name}: ${light};\n  --dxcm-dark-${name}: ${dark};`,
 ).join("\n");
 
 // `--dxcm-<name>: var(--dxcm-<scheme>-<name>);` for every entry -- points the
 // active variables at the chosen scheme's sources, with no color duplicated.
 function themeActivate(scheme) {
-  return THEME_PALETTE.map(
-    ({ name }) => `  --dxcm-${name}: var(--dxcm-${scheme}-${name});`,
-  ).join("\n");
+  return THEME_PALETTE.map(({ name }) => `  --dxcm-${name}: var(--dxcm-${scheme}-${name});`).join(
+    "\n",
+  );
 }
 
 // Inject the editor chrome stylesheet once. Colors come from the active
@@ -195,12 +188,33 @@ ${themeActivate("dark")}
 .dioxus-codemirror .cm-dropCursor {
   border-left-color: var(--dxcm-caret);
 }
-.dioxus-codemirror .cm-selectionBackground,
+/* Selection background, drawn by \`drawSelection\` as \`.cm-selectionBackground\`
+   layers. CodeMirror's base theme styles these with high-specificity selectors
+   (\`&light.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground\`,
+   ~5 classes) and keys light/dark off its own \`darkTheme\` facet -- which we do
+   not set, so it would always apply its light colors regardless of our scheme.
+   We therefore match its structure (and add \`.cm-editor\` to outweigh it) so our
+   variables win in both focus states and both schemes. */
+.dioxus-codemirror .cm-selectionLayer .cm-selectionBackground,
 .dioxus-codemirror .cm-content ::selection {
   background: var(--dxcm-selection);
 }
-.dioxus-codemirror .cm-focused .cm-selectionBackground {
+.dioxus-codemirror .cm-editor .cm-scroller .cm-highlightSpace {
+  background-image: radial-gradient(circle at 50% 55%, var(--dxcm-highlight-space) 20%, transparent 5%);
+}
+.dioxus-codemirror .cm-editor.cm-focused .cm-scroller .cm-selectionLayer .cm-selectionBackground {
   background: var(--dxcm-selection-focused);
+}
+/* Occurrences of the selected text, marked by \`selectionMatchHighlighter\` and
+   themed so they track the color scheme. Other occurrences get the match tint;
+   the actively selected occurrence (\`-main\`) is left to its (more prominent)
+   selection background instead, so it reads as the selection rather than as a
+   match. */
+.dioxus-codemirror .cm-selectionMatch {
+  background: var(--dxcm-selection-match);
+}
+.dioxus-codemirror .cm-selectionMatch.cm-selectionMatch-main {
+  background: var(--dxcm-selection-match-main);
 }
 .dioxus-codemirror .cm-gutters {
   background: var(--dxcm-gutter-bg);
@@ -264,7 +278,15 @@ function themeHighlightStyle() {
       color: "var(--dxcm-syntax-constant)",
     },
     {
-      tag: [tags.typeName, tags.className, tags.namespace, tags.changed, tags.annotation, tags.modifier, tags.self],
+      tag: [
+        tags.typeName,
+        tags.className,
+        tags.namespace,
+        tags.changed,
+        tags.annotation,
+        tags.modifier,
+        tags.self,
+      ],
       color: "var(--dxcm-syntax-type)",
     },
     {
@@ -272,7 +294,13 @@ function themeHighlightStyle() {
       color: "var(--dxcm-syntax-number)",
     },
     {
-      tag: [tags.operator, tags.operatorKeyword, tags.escape, tags.regexp, tags.special(tags.string)],
+      tag: [
+        tags.operator,
+        tags.operatorKeyword,
+        tags.escape,
+        tags.regexp,
+        tags.special(tags.string),
+      ],
       color: "var(--dxcm-syntax-operator)",
     },
     {
@@ -297,6 +325,163 @@ function themeHighlightStyle() {
   ]);
 }
 
+// `Mod-d` command: add the next occurrence of the current selection as an extra
+// selection range. Unlike CodeMirror's `selectNextOccurrence`, this matches
+// substrings -- it does not restrict a whole-word selection to whole-word
+// matches -- so selecting "hello" also extends into "helloabcd". Requires
+// `allow_multiple_selections`.
+function selectNextMatch(view) {
+  const { state } = view;
+  const { selection } = state;
+  const main = selection.main;
+
+  // First press on a bare cursor: select the word under it (the term to extend).
+  if (main.empty) {
+    const word = state.wordAt(main.head);
+    if (!word) {
+      return false;
+    }
+    view.dispatch({
+      selection: EditorSelection.create(
+        selection.ranges.map((range, index) =>
+          index === selection.mainIndex ? EditorSelection.range(word.from, word.to) : range,
+        ),
+        selection.mainIndex,
+      ),
+    });
+    return true;
+  }
+
+  // Every existing range must hold the same text, else there is no single term
+  // to extend (mirrors CodeMirror's behaviour).
+  const query = state.sliceDoc(main.from, main.to);
+  const sameText = selection.ranges.every(
+    (range) => state.sliceDoc(range.from, range.to) === query,
+  );
+  if (!query || !sameText) {
+    return false;
+  }
+
+  const next = selectNextMatchFind(state, query, selection.ranges);
+  if (!next) {
+    return false;
+  }
+
+  view.dispatch({
+    selection: selection.addRange(EditorSelection.range(next.from, next.to)),
+    scrollIntoView: true,
+  });
+  return true;
+}
+
+// Next occurrence of `query` after the last selection range, wrapping around to
+// the start, skipping ranges that are already selected.
+function selectNextMatchFind(state, query, ranges) {
+  const taken = new Set(ranges.map((range) => `${range.from}:${range.to}`));
+  const after = ranges[ranges.length - 1].to;
+  const scan = (from, to) => {
+    const cursor = new SearchCursor(state.doc, query, from, to);
+    while (!cursor.next().done) {
+      if (!taken.has(`${cursor.value.from}:${cursor.value.to}`)) {
+        return cursor.value;
+      }
+    }
+    return null;
+  };
+  return scan(after, state.doc.length) ?? scan(0, after);
+}
+
+// `Mod-F2` command: select every occurrence of the current selection (or the
+// word under a bare cursor) at once, substring matches included. Requires
+// `allow_multiple_selections`.
+function selectAllMatches(view) {
+  const { state } = view;
+  const main = state.selection.main;
+
+  // The term to match: the selected text, or the word under a bare cursor.
+  let term;
+  if (main.empty) {
+    const word = state.wordAt(main.head);
+    term = word && state.sliceDoc(word.from, word.to);
+  } else {
+    term = state.sliceDoc(main.from, main.to);
+  }
+  if (!term) {
+    return false;
+  }
+
+  const ranges = [];
+  const cursor = new SearchCursor(state.doc, term);
+  while (!cursor.next().done) {
+    ranges.push(EditorSelection.range(cursor.value.from, cursor.value.to));
+  }
+  if (ranges.length === 0) {
+    return false;
+  }
+
+  // Keep the caret on the first match at or after the original selection.
+  const mainIndex = ranges.findIndex((range) => range.from >= main.from);
+  view.dispatch({
+    selection: EditorSelection.create(ranges, mainIndex < 0 ? 0 : mainIndex),
+    scrollIntoView: true,
+  });
+  return true;
+}
+
+// View plugin that marks every visible occurrence of the actively selected text
+// with the `cm-selectionMatch` class -- the selected range included. This is
+// used instead of CodeMirror's `highlightSelectionMatches`, which never marks
+// the selection's own range (so the selected word loses its highlight) and bails
+// out entirely once there is more than one selection. A bare cursor (no
+// selection) highlights nothing -- only an explicit selection does.
+function selectionMatchHighlighter() {
+  // Other occurrences get `cm-selectionMatch`; an occurrence that coincides with
+  // a selection range also gets `cm-selectionMatch-main`, so the actively
+  // selected match can be styled apart from the rest.
+  const matchDeco = Decoration.mark({ class: "cm-selectionMatch" });
+  const mainDeco = Decoration.mark({
+    class: "cm-selectionMatch cm-selectionMatch-main",
+  });
+  const compute = (view) => {
+    const { state } = view;
+    const main = state.selection.main;
+    if (main.empty) {
+      return Decoration.none;
+    }
+    const term = state.sliceDoc(main.from, main.to);
+    // Occurrences coinciding with a selection range are "main".
+    const selected = new Set();
+    for (const range of state.selection.ranges) {
+      if (!range.empty) {
+        selected.add(`${range.from}:${range.to}`);
+      }
+    }
+    const ranges = [];
+    for (const visible of view.visibleRanges) {
+      const cursor = new SearchCursor(state.doc, term, visible.from, visible.to);
+      while (!cursor.next().done) {
+        const { from, to } = cursor.value;
+        const deco = selected.has(`${from}:${to}`) ? mainDeco : matchDeco;
+        ranges.push(deco.range(from, to));
+      }
+    }
+    return ranges.length ? Decoration.set(ranges, true) : Decoration.none;
+  };
+  return ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.decorations = compute(view);
+      }
+      update(update) {
+        if (update.selectionSet || update.docChanged || update.viewportChanged) {
+          this.decorations = compute(update.view);
+        }
+      }
+    },
+    { decorations: (plugin) => plugin.decorations },
+  );
+}
+
 // The first message from Rust is always the init config.
 const config = await dioxus.recv();
 
@@ -304,16 +489,31 @@ const {
   EditorView,
   minimalSetup,
   EditorState,
+  EditorSelection,
   Annotation,
   lineNumbers,
   highlightActiveLineGutter,
+  highlightActiveLine,
+  highlightWhitespace,
+  rectangularSelection,
+  crosshairCursor,
+  keymap,
+  Decoration,
+  ViewPlugin,
   HighlightStyle,
   syntaxHighlighting,
+  bracketMatching,
+  indentOnInput,
+  SearchCursor,
+  closeBrackets,
+  closeBracketsKeymap,
+  indentWithTab,
   tags,
-  yaml,
-  markdown,
   LSPClient,
   languageServerExtensions,
+  // Map of bundled language factories keyed by name, e.g. `{ yaml, markdown }`.
+  // Which languages are present depends on the enabled `lang-*` Cargo features.
+  languages,
 } = await codeMirrorLoad(config.cm_base);
 
 // Guard so programmatic `doc_set` updates do not echo back as `doc_changed`.
@@ -342,10 +542,78 @@ if (config.line_numbers) {
   extensions.push(lineNumbers(), highlightActiveLineGutter());
 }
 
-if (config.language === "yaml") {
-  extensions.push(yaml());
-} else if (config.language === "markdown") {
-  extensions.push(markdown());
+// === Optional editor features === //
+// Each maps to the CodeMirror extension of the same name, toggled by a flag in
+// the init config (see the matching `CodeMirror` props). `minimalSetup` already
+// includes `drawSelection` and the default keymap, so multiple selections only
+// need the facet and added keymaps layer on top of the defaults.
+if (config.allow_multiple_selections) {
+  // Enable the facet, then bind `Mod-d` to add the next occurrence of the
+  // selection and `Mod-F2` to add all occurrences (`Mod` is Cmd on macOS, Ctrl
+  // elsewhere). Both match substrings, unlike the search keymap's
+  // `selectNextOccurrence`. These produce extra cursors, so they belong with the
+  // facet rather than with `highlightSelectionMatches` (which is visual only).
+  extensions.push(
+    EditorState.allowMultipleSelections.of(true),
+    keymap.of([
+      { key: "Mod-d", run: selectNextMatch, preventDefault: true },
+      { key: "Mod-F2", run: selectAllMatches, preventDefault: true },
+    ]),
+  );
+}
+if (config.highlight_active_line) {
+  extensions.push(highlightActiveLine());
+}
+if (config.highlight_selection_matches) {
+  // Highlight all occurrences of the selected text, the selection included
+  // (visual only; the match-selecting keymaps live under
+  // `allow_multiple_selections`).
+  extensions.push(selectionMatchHighlighter());
+}
+if (config.bracket_matching) {
+  extensions.push(bracketMatching());
+}
+if (config.close_brackets) {
+  extensions.push(closeBrackets(), keymap.of(closeBracketsKeymap));
+}
+if (config.rectangular_selection) {
+  extensions.push(rectangularSelection(), crosshairCursor());
+}
+if (config.indent_on_input) {
+  extensions.push(indentOnInput());
+}
+if (config.highlight_whitespace) {
+  extensions.push(highlightWhitespace());
+}
+if (config.line_wrapping) {
+  extensions.push(EditorView.lineWrapping);
+}
+if (config.indent_with_tab) {
+  // Bind Tab/Shift-Tab to indent, so Tab inserts indentation instead of moving
+  // focus out of the editor. Off by default to keep Tab as a focus escape for
+  // keyboard accessibility.
+  extensions.push(keymap.of([indentWithTab]));
+}
+if (config.read_only) {
+  extensions.push(EditorState.readOnly.of(true));
+}
+if (typeof config.tab_size === "number") {
+  extensions.push(EditorState.tabSize.of(config.tab_size));
+}
+
+// Apply the syntax extension for the requested language, if it was bundled. A
+// language is bundled only when its `lang-*` Cargo feature is enabled; an
+// un-bundled language falls back to plain text rather than failing.
+if (config.language) {
+  const languageFactory = languages?.[config.language];
+  if (languageFactory) {
+    extensions.push(languageFactory());
+  } else {
+    console.warn(
+      `dioxus_codemirror: language "${config.language}" is not bundled; ` +
+        `enable its Cargo feature (lang-${config.language}) on dioxus_codemirror`,
+    );
+  }
 }
 
 // === LSP wiring === //
