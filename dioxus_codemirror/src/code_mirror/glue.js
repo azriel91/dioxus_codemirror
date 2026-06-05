@@ -507,6 +507,7 @@ const {
   SearchCursor,
   closeBrackets,
   closeBracketsKeymap,
+  indentWithTab,
   tags,
   LSPClient,
   languageServerExtensions,
@@ -586,6 +587,12 @@ if (config.highlight_whitespace) {
 }
 if (config.line_wrapping) {
   extensions.push(EditorView.lineWrapping);
+}
+if (config.indent_with_tab) {
+  // Bind Tab/Shift-Tab to indent, so Tab inserts indentation instead of moving
+  // focus out of the editor. Off by default to keep Tab as a focus escape for
+  // keyboard accessibility.
+  extensions.push(keymap.of([indentWithTab]));
 }
 if (config.read_only) {
   extensions.push(EditorState.readOnly.of(true));

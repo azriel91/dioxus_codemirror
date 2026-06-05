@@ -79,6 +79,11 @@ pub struct CodeMirrorProps {
     /// `EditorView.lineWrapping`. Defaults to `false`.
     #[props(default)]
     pub line_wrapping: bool,
+    /// Bind `Tab`/`Shift-Tab` to indent, mapping to `keymap.of([indentWithTab])`
+    /// so `Tab` inserts indentation rather than moving focus out of the editor.
+    /// Defaults to `false`, keeping `Tab` as a focus escape for accessibility.
+    #[props(default)]
+    pub indent_with_tab: bool,
     /// Make the document read-only, mapping to `EditorState.readOnly`. Defaults
     /// to `false`.
     #[props(default)]
@@ -120,6 +125,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
         indent_on_input,
         highlight_whitespace,
         line_wrapping,
+        indent_with_tab,
         read_only,
         tab_size,
         theme,
@@ -162,6 +168,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                 indent_on_input,
                 highlight_whitespace,
                 line_wrapping,
+                indent_with_tab,
                 read_only,
                 tab_size,
                 lsp_uri: lsp.as_ref().map(|lsp| lsp.uri.clone()),

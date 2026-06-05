@@ -39,6 +39,7 @@ pub enum Cmd {
         indent_on_input: bool,
         highlight_whitespace: bool,
         line_wrapping: bool,
+        indent_with_tab: bool,
         read_only: bool,
         tab_size: Option<u8>,
         lsp_uri: Option<String>,

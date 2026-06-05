@@ -84,6 +84,7 @@ rsx! {
 | `indent_on_input: bool` | `indentOnInput` |
 | `highlight_whitespace: bool` | `highlightWhitespace` |
 | `line_wrapping: bool` | `EditorView.lineWrapping` |
+| `indent_with_tab: bool` | `keymap.of([indentWithTab])` -- `Tab`/`Shift-Tab` indent (off by default; keeps `Tab` as a focus escape) |
 | `read_only: bool` | `EditorState.readOnly` |
 | `tab_size: Option<u8>` | `EditorState.tabSize` |
 
