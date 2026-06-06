@@ -105,18 +105,21 @@ rsx! {
 
 | Prop | CodeMirror extension |
 | --- | --- |
-| `allow_multiple_selections: bool` | `EditorState.allowMultipleSelections`; also binds `Mod-d` to select the next match and `Mod-F2` to select all matches (`Mod` = Cmd on macOS, Ctrl elsewhere; substring matches included) |
-| `highlight_selection_matches: bool` | highlights every occurrence of the selected text, the selection included (custom; visual only) |
-| `highlight_active_line: bool` | `highlightActiveLine` |
-| `bracket_matching: bool` | `bracketMatching` |
-| `close_brackets: bool` | `closeBrackets` |
-| `rectangular_selection: bool` | `rectangularSelection` + `crosshairCursor` (Alt-drag) |
-| `indent_on_input: bool` | `indentOnInput` |
-| `highlight_whitespace: bool` | `highlightWhitespace` |
-| `line_wrapping: bool` | `EditorView.lineWrapping` |
-| `indent_with_tab: bool` | `keymap.of([indentWithTab])` -- `Tab`/`Shift-Tab` indent (off by default; keeps `Tab` as a focus escape) |
-| `read_only: bool` | `EditorState.readOnly` |
-| `tab_size: Option<u8>` | `EditorState.tabSize` |
+| `allow_multiple_selections` | Allows multiple selections in the editor. Also binds `Ctrl/Cmd-d` to select the next match and `Ctrl/Cmd-F2` to select all matches. |
+| `bracket_matching` | Highlight the bracket matching the one next to the cursor. |
+| `close_brackets` | Auto-insert closing brackets and quotes. |
+| `highlight_active_line` | Highlight the line the primary cursor is on. |
+| `highlight_selection_matches` | Highlight every occurrence of the selected text, the selection included. |
+| `highlight_whitespace` | Render whitespace characters visibly. |
+| `indent_on_input` | Re-indent lines as you type. |
+| `indent_with_tab` | Bind `Tab`/`Shift-Tab` to indent, so `Tab` inserts indentation rather than moving focus out of the editor. |
+| `language` | Syntax highlighting language, e.g. `Language::Yaml`. Defaults to plain text (`None`). |
+| `line_numbers` | Show a line-number gutter. |
+| `line_wrapping` | Wrap long lines instead of scrolling horizontally. |
+| `read_only` | Make the document read-only, |
+| `rectangular_selection` | Allow rectangular (block) selection via `Alt`-drag. |
+| `tab_size` | Width of a tab in spaces. |
+| `theme` | Color theme, e.g. `Theme::Dark`. Defaults to `Theme::Auto`. |
 
 
 ## Choosing languages

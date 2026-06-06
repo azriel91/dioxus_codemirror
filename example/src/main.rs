@@ -78,10 +78,12 @@ fn App() -> Element {
             CodeMirror {
                 value: value_plain,
                 allow_multiple_selections: true,
-                highlight_selection_matches: true,
-                highlight_active_line: true,
                 bracket_matching: true,
                 close_brackets: true,
+                highlight_active_line: true,
+                highlight_selection_matches: true,
+                highlight_whitespace: true,
+                line_numbers: true,
                 line_wrapping: true,
             }
             pre { "{value_plain}" }
@@ -100,14 +102,15 @@ fn App() -> Element {
             }
             CodeMirror {
                 value: value_yaml,
-                line_numbers: true,
                 allow_multiple_selections: true,
-                highlight_selection_matches: true,
-                highlight_active_line: true,
                 bracket_matching: true,
                 close_brackets: true,
-                line_wrapping: true,
+                highlight_active_line: true,
+                highlight_selection_matches: true,
+                highlight_whitespace: true,
                 language: Language::Yaml,
+                line_numbers: true,
+                line_wrapping: true,
                 theme: theme_yaml(),
             }
         }
