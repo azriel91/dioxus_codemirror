@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use dioxus::{
-    document::{Eval, eval},
+    document::{eval, Eval},
     prelude::*,
 };
 use futures::StreamExt;
@@ -29,32 +29,13 @@ pub struct CodeMirrorProps {
     /// Editing in the browser writes the new text here; writing to it from
     /// elsewhere on the page replaces the editor's contents.
     pub value: Signal<String>,
-    /// Show a line-number gutter. Defaults to `false`.
-    #[props(default)]
-    pub line_numbers: bool,
-    /// Syntax highlighting language, e.g. `Language::Yaml`. Defaults to plain
-    /// text (`None`).
-    #[props(default)]
-    pub language: Option<Language>,
     /// Allow multiple selections / cursors, mapping to
-    /// `EditorState.allowMultipleSelections`. As well as `Alt`-click, this binds
-    /// `Mod-d` to add the next occurrence of the selection and `Mod-F2` to add
-    /// all occurrences (`Mod` is Cmd on macOS, Ctrl elsewhere; both match
-    /// substrings). Defaults to `false`.
+    /// `EditorState.allowMultipleSelections`. As well as `Alt`-click, this
+    /// binds `Mod-d` to add the next occurrence of the selection and
+    /// `Mod-F2` to add all occurrences (`Mod` is Cmd on macOS, Ctrl
+    /// elsewhere; both match substrings). Defaults to `false`.
     #[props(default)]
     pub allow_multiple_selections: bool,
-    /// Highlight every occurrence of the selected text, the selected range
-    /// included. Unlike CodeMirror's `highlightSelectionMatches`, the active
-    /// selection itself is highlighted and the highlight survives multiple
-    /// selections; a bare cursor (no selection) highlights nothing. Visual only;
-    /// the match-selecting keybindings live under
-    /// [`Self::allow_multiple_selections`]. Defaults to `false`.
-    #[props(default)]
-    pub highlight_selection_matches: bool,
-    /// Highlight the line the primary cursor is on, mapping to
-    /// `highlightActiveLine`. Defaults to `false`.
-    #[props(default)]
-    pub highlight_active_line: bool,
     /// Highlight the bracket matching the one next to the cursor, mapping to
     /// `bracketMatching`. Defaults to `false`.
     #[props(default)]
@@ -63,31 +44,58 @@ pub struct CodeMirrorProps {
     /// Defaults to `false`.
     #[props(default)]
     pub close_brackets: bool,
-    /// Allow rectangular (block) selection via `Alt`-drag, mapping to
-    /// `rectangularSelection` plus `crosshairCursor`. Defaults to `false`.
+    /// Highlight the line the primary cursor is on, mapping to
+    /// `highlightActiveLine`. Defaults to `false`.
     #[props(default)]
-    pub rectangular_selection: bool,
-    /// Re-indent lines as you type, mapping to `indentOnInput`. Defaults to
-    /// `false`.
+    pub highlight_active_line: bool,
+    /// Highlight every occurrence of the selected text, the selected range
+    /// included. Unlike CodeMirror's `highlightSelectionMatches`, the active
+    /// selection itself is highlighted and the highlight survives multiple
+    /// selections; a bare cursor (no selection) highlights nothing. Visual
+    /// only; the match-selecting keybindings live under
+    /// [`Self::allow_multiple_selections`]. Defaults to `false`.
     #[props(default)]
-    pub indent_on_input: bool,
+    pub highlight_selection_matches: bool,
     /// Render whitespace characters visibly, mapping to `highlightWhitespace`.
     /// Defaults to `false`.
     #[props(default)]
     pub highlight_whitespace: bool,
+    /// Re-indent lines as you type, mapping to `indentOnInput`. Defaults to
+    /// `false`.
+    #[props(default)]
+    pub indent_on_input: bool,
+    /// Bind `Tab`/`Shift-Tab` to indent, mapping to
+    /// `keymap.of([indentWithTab])` so `Tab` inserts indentation rather
+    /// than moving focus out of the editor. Defaults to `false`, keeping
+    /// `Tab` as a focus escape for accessibility.
+    #[props(default)]
+    pub indent_with_tab: bool,
+    /// Syntax highlighting language, e.g. `Language::Yaml`. Defaults to plain
+    /// text (`None`).
+    #[props(default)]
+    pub language: Option<Language>,
+    /// Show a line-number gutter. Defaults to `false`.
+    #[props(default)]
+    pub line_numbers: bool,
     /// Wrap long lines instead of scrolling horizontally, mapping to
     /// `EditorView.lineWrapping`. Defaults to `false`.
     #[props(default)]
     pub line_wrapping: bool,
-    /// Bind `Tab`/`Shift-Tab` to indent, mapping to `keymap.of([indentWithTab])`
-    /// so `Tab` inserts indentation rather than moving focus out of the editor.
-    /// Defaults to `false`, keeping `Tab` as a focus escape for accessibility.
+    /// Optional language server connection. When `Some`, an LSP client is
+    /// attached for [`LspBridge::uri`].
     #[props(default)]
-    pub indent_with_tab: bool,
+    pub lsp: Option<LspBridge>,
+    /// Called once, after the editor has been created and mounted.
+    #[props(default)]
+    pub on_ready: Option<EventHandler<()>>,
     /// Make the document read-only, mapping to `EditorState.readOnly`. Defaults
     /// to `false`.
     #[props(default)]
     pub read_only: bool,
+    /// Allow rectangular (block) selection via `Alt`-drag, mapping to
+    /// `rectangularSelection` plus `crosshairCursor`. Defaults to `false`.
+    #[props(default)]
+    pub rectangular_selection: bool,
     /// Width of a tab in spaces, mapping to `EditorState.tabSize`, e.g.
     /// `Some(2)`. `None` (the default) keeps CodeMirror's default.
     #[props(default)]
@@ -96,13 +104,6 @@ pub struct CodeMirrorProps {
     /// follows the operating system's `prefers-color-scheme`.
     #[props(default)]
     pub theme: Theme,
-    /// Optional language server connection. When `Some`, an LSP client is
-    /// attached for [`LspBridge::uri`].
-    #[props(default)]
-    pub lsp: Option<LspBridge>,
-    /// Called once, after the editor has been created and mounted.
-    #[props(default)]
-    pub on_ready: Option<EventHandler<()>>,
 }
 
 /// A CodeMirror 6 editor wrapped as a Dioxus web component.
@@ -114,27 +115,30 @@ pub struct CodeMirrorProps {
 pub fn CodeMirror(props: CodeMirrorProps) -> Element {
     let CodeMirrorProps {
         mut value,
-        line_numbers,
-        language,
         allow_multiple_selections,
-        highlight_selection_matches,
-        highlight_active_line,
         bracket_matching,
         close_brackets,
-        rectangular_selection,
-        indent_on_input,
+        highlight_active_line,
+        highlight_selection_matches,
         highlight_whitespace,
-        line_wrapping,
+        indent_on_input,
         indent_with_tab,
-        read_only,
-        tab_size,
-        theme,
+        language,
+        line_numbers,
+        line_wrapping,
         lsp,
         on_ready,
+        read_only,
+        rectangular_selection,
+        tab_size,
+        theme,
     } = props;
 
     let mount_id = use_hook(|| {
-        format!("cm-editor-{}", EDITOR_ID_NEXT.fetch_add(1, Ordering::Relaxed))
+        format!(
+            "cm-editor-{}",
+            EDITOR_ID_NEXT.fetch_add(1, Ordering::Relaxed)
+        )
     });
 
     // The glue script's evaluator handle, shared with the doc-set effect once
@@ -157,21 +161,21 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                 mount_id,
                 cm_base: CM_ASSETS.to_string(),
                 doc: value.peek().clone(),
-                line_numbers,
-                language,
                 allow_multiple_selections,
-                highlight_selection_matches,
-                highlight_active_line,
                 bracket_matching,
                 close_brackets,
-                rectangular_selection,
-                indent_on_input,
+                highlight_active_line,
+                highlight_selection_matches,
                 highlight_whitespace,
-                line_wrapping,
+                indent_on_input,
                 indent_with_tab,
-                read_only,
-                tab_size,
+                language,
+                line_numbers,
+                line_wrapping,
                 lsp_uri: lsp.as_ref().map(|lsp| lsp.uri.clone()),
+                read_only,
+                rectangular_selection,
+                tab_size,
             };
             if evaluator.send(init).is_err() {
                 return;
@@ -220,8 +224,9 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
     use_future(move || {
         let lsp_push = lsp_push.clone();
         async move {
-            let Some(mut messages_pushed_rx) =
-                lsp_push.as_ref().and_then(LspBridge::messages_pushed_rx_take)
+            let Some(mut messages_pushed_rx) = lsp_push
+                .as_ref()
+                .and_then(LspBridge::messages_pushed_rx_take)
             else {
                 return;
             };

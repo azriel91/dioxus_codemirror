@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<!-- cargo about generate about.hbs -o example/assets/licenses.html -->
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            background: #f8f9fb;
+            color: #1a1d23;
+        }
+        .container {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .intro {
+            text-align: center;
+        }
+        .license {
+            margin-bottom: 30px;
+        }
+        .licenses-list {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+        .license-used-by {
+            margin-top: -10px;
+        }
+        .license-text {
+            max-height: 200px;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+            padding: 20px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            background: #f3f4f6;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #0f1116;
+                color: white;
+            }
+            a {
+                color: skyblue;
+            }
+            .license-text {
+                border: 1px solid #111122;
+                background: #000409;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="container">
+        <div class="intro">
+            <h1>Third Party Licenses</h1>
+            <p>This page lists the licenses of the projects used in dioxus_codemirror.</p>
+        </div>
+
+        <h2>Overview of licenses:</h2>
+        <ul class="licenses-overview">
+            {{#each overview}}
+            <li><a href="#{{id}}">{{name}}</a> ({{count}})</li>
+            {{/each}}
+        </ul>
+
+        <h2>All license text:</h2>
+        <ul class="licenses-list">
+            {{#each licenses}}
+            <li class="license">
+                <h3 id="{{id}}">{{name}}</h3>
+                <h4>Used by:</h4>
+                <ul class="license-used-by">
+                    {{#each used_by}}
+                    <li><a href="{{#if crate.repository}} {{crate.repository}} {{else}} https://crates.io/crates/{{crate.name}} {{/if}}">{{crate.name}} {{crate.version}}</a></li>
+                    {{/each}}
+                </ul>
+                <pre class="license-text">{{text}}</pre>
+            </li>
+            {{/each}}
+        </ul>
+    </main>
+</body>
+
+</html>

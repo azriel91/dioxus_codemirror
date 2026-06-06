@@ -1,0 +1,16 @@
+# Keep in sync with the `[licenses] allow` list in `deny.toml`.
+accepted = [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause", # wasm
+    "BSL-1.0",
+    "CC0-1.0",
+    # `webpki-roots` (Mozilla CA cert bundle), pulled in by `xtask`'s `ureq`.
+    # `xtask` is a dev tool (`publish = false`); it is not shipped in the crate.
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "Unicode-3.0",
+    "Zlib",
+]

@@ -151,8 +151,7 @@ struct ModuleVendored {
 
 impl CodemirrorVendor {
     fn new() -> Self {
-        let import_regex =
-            Regex::new(r#"(?:from|import)\s*\(?\s*["']([^"']+)["']"#).unwrap();
+        let import_regex = Regex::new(r#"(?:from|import)\s*\(?\s*["']([^"']+)["']"#).unwrap();
         Self { import_regex }
     }
 
@@ -201,10 +200,13 @@ impl CodemirrorVendor {
         module_graph: &BTreeMap<String, Vec<String>>,
         out_dir: &Path,
     ) -> Result<(), Box<dyn Error>> {
-        let core_seeds: Vec<String> =
-            CORE_ENTRIES.iter().map(|entry| Self::file_stem(entry)).collect();
-        let core: Vec<String> =
-            Self::closure(module_graph, &core_seeds).into_iter().collect();
+        let core_seeds: Vec<String> = CORE_ENTRIES
+            .iter()
+            .map(|entry| Self::file_stem(entry))
+            .collect();
+        let core: Vec<String> = Self::closure(module_graph, &core_seeds)
+            .into_iter()
+            .collect();
 
         let languages: Vec<LanguageManifest> = LANGUAGES
             .iter()
@@ -231,10 +233,7 @@ impl CodemirrorVendor {
     }
 
     /// Transitive closure of `seeds` over `module_graph`, by output file stem.
-    fn closure(
-        module_graph: &BTreeMap<String, Vec<String>>,
-        seeds: &[String],
-    ) -> BTreeSet<String> {
+    fn closure(module_graph: &BTreeMap<String, Vec<String>>, seeds: &[String]) -> BTreeSet<String> {
         let mut done = BTreeSet::new();
         let mut queue: VecDeque<String> = seeds.iter().cloned().collect();
         while let Some(stem) = queue.pop_front() {
@@ -270,10 +269,18 @@ impl CodemirrorVendor {
         // relative imports it contains. The `*` prefix marks dependencies
         // external, so esm.sh emits one file per package with bare imports.
         let (fetch_url, source_path, out_stem) = if module.starts_with('/') {
-            (format!("{ESM}{module}"), module.to_string(), Self::path_stem(module))
+            (
+                format!("{ESM}{module}"),
+                module.to_string(),
+                Self::path_stem(module),
+            )
         } else {
             let spec = Self::package_spec(module);
-            (format!("{ESM}/*{spec}?target=es2022"), String::new(), Self::file_stem(module))
+            (
+                format!("{ESM}/*{spec}?target=es2022"),
+                String::new(),
+                Self::file_stem(module),
+            )
         };
 
         let mut code = Self::http_get(&fetch_url)?;
@@ -293,7 +300,9 @@ impl CodemirrorVendor {
                 continue;
             }
             if specifier.contains("://") {
-                return Err(format!("{module}: unexpected absolute-URL import {specifier:?}").into());
+                return Err(
+                    format!("{module}: unexpected absolute-URL import {specifier:?}").into(),
+                );
             }
             // Resolve the import to a queue entry (bare name or absolute path)
             // and the sibling file it should point at.
@@ -322,7 +331,11 @@ impl CodemirrorVendor {
         let file_path = out_dir.join(format!("{out_stem}.js"));
         fs::write(&file_path, code)?;
         println!("  {module} -> {}", file_path.display());
-        Ok(ModuleVendored { out_stem, dep_modules, dep_stems })
+        Ok(ModuleVendored {
+            out_stem,
+            dep_modules,
+            dep_stems,
+        })
     }
 
     /// Whether `specifier` looks like a real module specifier rather than a
@@ -370,7 +383,13 @@ impl CodemirrorVendor {
         let trimmed = path.trim_start_matches('/').trim_end_matches(".mjs");
         trimmed
             .chars()
-            .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect()
     }
 
@@ -391,7 +410,8 @@ impl CodemirrorVendor {
         }
     }
 
-    /// File stem for a package, e.g. `@codemirror/state` -> `codemirror__state`.
+    /// File stem for a package, e.g. `@codemirror/state` ->
+    /// `codemirror__state`.
     fn file_stem(name: &str) -> String {
         name.trim_start_matches('@').replace('/', "__")
     }

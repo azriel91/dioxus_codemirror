@@ -1,9 +1,10 @@
 //! A Dioxus web component that wraps the [CodeMirror 6] editor.
 //!
 //! [`CodeMirror`] drives a CodeMirror editor through a single long-lived
-//! `document::eval` channel (the script lives in `code_mirror/glue.js`),
-//! loading CodeMirror at runtime from esm.sh -- so there is no JavaScript build
-//! step. Typed [`Cmd`]/[`Evt`] messages cross the channel as JSON.
+//! `document::eval` channel (the script lives in `code_mirror/glue.js`).
+//! CodeMirror is vendored as a Dioxus folder asset, so there is no JavaScript
+//! build step and no runtime CDN dependency. Typed [`Cmd`]/[`Evt`] messages
+//! cross the channel as JSON.
 //!
 //! It supports:
 //!

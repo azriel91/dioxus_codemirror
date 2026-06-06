@@ -1,5 +1,5 @@
 use dioxus_codemirror::{LspMessage, LspServer};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 /// A stand-in language server that returns canned JSON-RPC responses.
 ///

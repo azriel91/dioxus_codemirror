@@ -11,7 +11,8 @@ use crate::language::Language;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Cmd {
-    /// First message sent to the glue script, carrying the editor configuration.
+    /// First message sent to the glue script, carrying the editor
+    /// configuration.
     ///
     /// `mount_id`: the DOM id of the element the editor mounts into, e.g.
     /// `"cm-editor-0"`. `cm_base`: base URL of the vendored CodeMirror assets,

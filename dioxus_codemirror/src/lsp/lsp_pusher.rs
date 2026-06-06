@@ -6,8 +6,9 @@ use crate::lsp::lsp_message::LspMessage;
 ///
 /// The [`CodeMirror`] component drains this and forwards each [`LspMessage`] to
 /// the editor's LSP client via `Cmd::LspMessageSend`. It carries both async
-/// replies and server-initiated messages (e.g. `textDocument/publishDiagnostics`
-/// diagnostics) uniformly -- anything the server pushes, whenever it pushes it.
+/// replies and server-initiated messages (e.g.
+/// `textDocument/publishDiagnostics` diagnostics) uniformly -- anything the
+/// server pushes, whenever it pushes it.
 ///
 /// [`CodeMirror`]: crate::code_mirror::CodeMirror
 pub type LspMessageRx = UnboundedReceiver<LspMessage>;
@@ -16,10 +17,10 @@ pub type LspMessageRx = UnboundedReceiver<LspMessage>;
 /// [`LspServerAsync`] so it can emit messages to the editor at any time.
 ///
 /// Unlike the synchronous [`LspServer`] -- whose only output is the `Vec` it
-/// *returns* from handling a message -- an async / worker-backed server holds an
-/// `LspPusher` and pushes onto it whenever it has something to say: a reply that
-/// arrives later (e.g. from a Web Worker), or an unprompted notification like
-/// `textDocument/publishDiagnostics`.
+/// *returns* from handling a message -- an async / worker-backed server holds
+/// an `LspPusher` and pushes onto it whenever it has something to say: a reply
+/// that arrives later (e.g. from a Web Worker), or an unprompted notification
+/// like `textDocument/publishDiagnostics`.
 ///
 /// Cloneable, so the server can keep one copy to push from and move others into
 /// worker message callbacks.
@@ -33,8 +34,8 @@ pub struct LspPusher {
 }
 
 impl LspPusher {
-    /// Returns a new `LspPusher`/[`LspMessageRx`] pair connected by an unbounded
-    /// channel.
+    /// Returns a new `LspPusher`/[`LspMessageRx`] pair connected by an
+    /// unbounded channel.
     ///
     /// The pusher goes to the server (via
     /// [`LspServerAsync::lsp_pusher_set`]); the receiver goes to the
@@ -49,9 +50,9 @@ impl LspPusher {
 
     /// Pushes `message` to the editor's LSP client.
     ///
-    /// Returns `true` if the message was queued, or `false` if the receiving end
-    /// is gone (the editor was torn down) -- in which case the server may stop
-    /// pushing.
+    /// Returns `true` if the message was queued, or `false` if the receiving
+    /// end is gone (the editor was torn down) -- in which case the server
+    /// may stop pushing.
     pub fn lsp_message_push(&self, message: LspMessage) -> bool {
         self.message_tx.unbounded_send(message).is_ok()
     }

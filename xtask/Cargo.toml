@@ -1,8 +1,16 @@
 [package]
 name = "xtask"
+description = "Development tasks for `dioxus_codemirror`, e.g. vendoring CodeMirror."
 version.workspace = true
+authors.workspace = true
 edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
 publish = false
+
+[lints]
+workspace = true
 
 [dependencies]
 regex = "1"

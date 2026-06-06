@@ -1,15 +1,26 @@
 [package]
 name = "dioxus_codemirror"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
 description = "A Dioxus web component that wraps the CodeMirror 6 editor."
+documentation = "https://docs.rs/dioxus_codemirror/"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+categories.workspace = true
+keywords.workspace = true
+license.workspace = true
+
+[lib]
+doctest = true
+test = false
+
+[lints]
+workspace = true
 
 [features]
-# Default to the languages the component historically shipped, so existing
-# consumers keep YAML and Markdown highlighting without opting in.
-default = ["lang-yaml", "lang-markdown"]
+default = []
 # Each `lang-*` feature bundles one CodeMirror language. `build.rs` copies only
 # the files for the enabled languages into the served asset folder, so disabled
 # languages are never shipped to `dist`. Enable extras with, e.g.
@@ -29,6 +40,9 @@ lang-all = [
 ]
 
 [dependencies]
+# Not inherited from the workspace: this crate needs `default-features = false`,
+# which a workspace dependency cannot override. The `example` crate uses the
+# workspace `dioxus` (with default features) plus the `web` platform feature.
 dioxus = { version = "0.7", default-features = false, features = [
     "macro",
     "html",

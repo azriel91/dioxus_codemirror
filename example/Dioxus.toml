@@ -1,0 +1,23 @@
+[application]
+
+[web.app]
+# Served from `https://azriel.im/dioxus_codemirror/` on GitHub Pages.
+base_path = "dioxus_codemirror"
+
+# HTML title tag content
+title = "dioxus_codemirror example"
+
+# include `assets` in web platform
+[web.resource]
+
+# Additional CSS style files
+style = []
+
+# Additional JavaScript files
+script = []
+
+[web.resource.dev]
+
+# Javascript code file
+# serve: [dev-server] only
+script = []

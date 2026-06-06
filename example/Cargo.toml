@@ -1,10 +1,18 @@
 [package]
 name = "example"
+description = "Demo application for the `dioxus_codemirror` component."
 version.workspace = true
+authors.workspace = true
 edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
 publish = false
 
+[lints]
+workspace = true
+
 [dependencies]
-dioxus_codemirror = { workspace = true }
+dioxus_codemirror = { workspace = true, features = ["lang-all"] }
 dioxus = { workspace = true, features = ["web"] }
 serde_json = { workspace = true }
