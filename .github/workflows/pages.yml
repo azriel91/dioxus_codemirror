@@ -45,7 +45,7 @@ jobs:
         uses: cargo-bins/cargo-binstall@main
 
       - name: Install dioxus-cli
-        run: cargo binstall dioxus-cli@0.7.0 --force
+        run: cargo binstall dioxus-cli@0.7.9 --force
 
       - name: Bundle web app
         # `--debug-symbols=false` is needed otherwise we run into `wasm-opt` failing:
