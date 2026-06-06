@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 /// features: the whole vendored superset is served because Dioxus cannot yet
 /// serve a build-script-generated, per-feature asset folder (see
 /// <https://github.com/DioxusLabs/dioxus/issues/4426> and
-/// [`code_mirror`](crate::code_mirror)). Selecting any variant works; should the
-/// looked-up name be missing from the `languages` map, the glue falls back to
-/// plain text with a console warning rather than failing.
+/// [`code_mirror`](crate::code_mirror)). Selecting any variant works; should
+/// the looked-up name be missing from the `languages` map, the glue falls back
+/// to plain text with a console warning rather than failing.
 ///
 /// [`CodeMirror`]: crate::code_mirror::CodeMirror
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
