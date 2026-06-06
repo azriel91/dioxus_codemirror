@@ -52,6 +52,13 @@ pub struct CodeMirrorProps {
     /// Defaults to `false`.
     #[props(default)]
     pub close_brackets: bool,
+    /// Enable LSP code actions, bound to `Mod-.` (Cmd-. on macOS, Ctrl-.
+    /// elsewhere). On press, the editor requests `textDocument/codeAction` for
+    /// the current selection and offers the returned actions in a menu,
+    /// applying the chosen action's edit. Requires [`Self::lsp`]; a no-op
+    /// without it. Defaults to `false`.
+    #[props(default)]
+    pub code_actions: bool,
     /// Highlight the line the primary cursor is on, mapping to
     /// `highlightActiveLine`. Defaults to `false`.
     #[props(default)]
@@ -126,6 +133,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
         allow_multiple_selections,
         bracket_matching,
         close_brackets,
+        code_actions,
         highlight_active_line,
         highlight_selection_matches,
         highlight_whitespace,
@@ -172,6 +180,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                 allow_multiple_selections,
                 bracket_matching,
                 close_brackets,
+                code_actions,
                 highlight_active_line,
                 highlight_selection_matches,
                 highlight_whitespace,

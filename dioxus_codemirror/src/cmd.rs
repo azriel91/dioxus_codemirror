@@ -36,6 +36,7 @@ pub enum Cmd {
         highlight_active_line: bool,
         bracket_matching: bool,
         close_brackets: bool,
+        code_actions: bool,
         rectangular_selection: bool,
         indent_on_input: bool,
         highlight_whitespace: bool,

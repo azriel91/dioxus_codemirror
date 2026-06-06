@@ -250,6 +250,36 @@ ${themeActivate("dark")}
   color: var(--dxcm-tooltip-fg);
   border: 1px solid var(--dxcm-border);
 }
+
+/* Code-action menu (triggered by Mod-.). Positioned absolutely within the
+   editor and themed with the tooltip variables. */
+.dioxus-codemirror .cm-dxcm-codeaction-menu {
+  position: absolute;
+  z-index: 20;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  min-width: 12em;
+  max-height: 16em;
+  overflow-y: auto;
+  background: var(--dxcm-tooltip-bg);
+  color: var(--dxcm-tooltip-fg);
+  border: 1px solid var(--dxcm-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font-family: monospace;
+  font-size: 90%;
+}
+.dioxus-codemirror .cm-dxcm-codeaction-item {
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dioxus-codemirror .cm-dxcm-codeaction-item[aria-selected="true"] {
+  background: var(--dxcm-tooltip-selected-bg);
+  color: var(--dxcm-tooltip-selected-fg);
+}
 `;
   document.head.appendChild(style);
 }
@@ -482,6 +512,230 @@ function selectionMatchHighlighter() {
   );
 }
 
+// The currently open code-action menu's teardown handle, or `null`. Only one
+// menu is open at a time (per page); opening a new one closes the previous.
+let codeActionMenuActive = null;
+
+// `Mod-.` command: request LSP code actions for the current selection and, if
+// any are returned, present them in a menu. Choosing one applies its edit.
+// Requires an attached LSP client (see `config.code_actions` / `config.lsp_uri`);
+// returns `false` (so `.` types normally) when there is none.
+function codeActionCommand(view) {
+  const plugin = LSPPlugin.get(view);
+  if (!plugin) {
+    return false;
+  }
+
+  // Flush pending edits so the server computes actions against the current text.
+  try {
+    plugin.client.sync();
+  } catch (_error) {
+    // Best-effort; the request below still carries the current range.
+  }
+
+  const selection = view.state.selection.main;
+  const params = {
+    textDocument: { uri: plugin.uri },
+    range: {
+      start: plugin.toPosition(selection.from),
+      end: plugin.toPosition(selection.to),
+    },
+    context: { diagnostics: [] },
+  };
+
+  plugin.client
+    .request("textDocument/codeAction", params)
+    .then((actions) => {
+      const applicable = (actions || []).filter(
+        (action) => action && (action.edit || action.command),
+      );
+      if (applicable.length > 0) {
+        codeActionMenuShow(view, plugin, applicable);
+      }
+    })
+    .catch((error) => {
+      plugin.reportError("Code action request failed", error);
+    });
+
+  // The request is async, but the keypress is handled (default `.` suppressed).
+  return true;
+}
+
+// Shows a keyboard-navigable menu of `actions` near the caret. Arrow keys move
+// the selection, Enter / Tab apply it, Escape (or a click outside) dismisses.
+function codeActionMenuShow(view, plugin, actions) {
+  codeActionMenuClose();
+
+  const menu = document.createElement("ul");
+  menu.className = "cm-dxcm-codeaction-menu";
+  menu.setAttribute("role", "listbox");
+
+  // Position just below the caret, relative to the (position: relative) editor.
+  const coords = view.coordsAtPos(view.state.selection.main.head);
+  const editorRect = view.dom.getBoundingClientRect();
+  if (coords) {
+    menu.style.top = `${Math.round(coords.bottom - editorRect.top)}px`;
+    menu.style.left = `${Math.round(coords.left - editorRect.left)}px`;
+  }
+
+  let selectedIndex = 0;
+  const items = actions.map((action, index) => {
+    const item = document.createElement("li");
+    item.className = "cm-dxcm-codeaction-item";
+    item.setAttribute("role", "option");
+    item.textContent = action.title || "(code action)";
+    item.addEventListener("mousedown", (event) => {
+      // Keep editor focus and stop the outside-click handler from firing.
+      event.preventDefault();
+      event.stopPropagation();
+      choose(index);
+    });
+    item.addEventListener("mousemove", () => setSelected(index));
+    menu.appendChild(item);
+    return item;
+  });
+
+  function setSelected(index) {
+    selectedIndex = index;
+    items.forEach((item, itemIndex) => {
+      if (itemIndex === index) {
+        item.setAttribute("aria-selected", "true");
+      } else {
+        item.removeAttribute("aria-selected");
+      }
+    });
+  }
+  setSelected(0);
+
+  function choose(index) {
+    const action = actions[index];
+    codeActionMenuClose();
+    if (action) {
+      codeActionApply(view, plugin, action);
+    }
+  }
+
+  function onKeyDown(event) {
+    switch (event.key) {
+      case "ArrowDown":
+        setSelected((selectedIndex + 1) % actions.length);
+        break;
+      case "ArrowUp":
+        setSelected((selectedIndex - 1 + actions.length) % actions.length);
+        break;
+      case "Enter":
+      case "Tab":
+        choose(selectedIndex);
+        break;
+      case "Escape":
+        codeActionMenuClose();
+        break;
+      default:
+        // Any other key dismisses the menu and is left for the editor.
+        codeActionMenuClose();
+        return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function onPointerDownOutside(event) {
+    if (!menu.contains(event.target)) {
+      codeActionMenuClose();
+    }
+  }
+
+  // Capture phase so these intercept before CodeMirror's own key handling.
+  view.contentDOM.addEventListener("keydown", onKeyDown, true);
+  document.addEventListener("mousedown", onPointerDownOutside, true);
+  view.dom.appendChild(menu);
+
+  codeActionMenuActive = () => {
+    view.contentDOM.removeEventListener("keydown", onKeyDown, true);
+    document.removeEventListener("mousedown", onPointerDownOutside, true);
+    menu.remove();
+  };
+}
+
+// Closes the open code-action menu, if any.
+function codeActionMenuClose() {
+  if (codeActionMenuActive) {
+    const teardown = codeActionMenuActive;
+    codeActionMenuActive = null;
+    teardown();
+  }
+}
+
+// Applies a code action's `WorkspaceEdit` to the editor for the current file.
+// Only edits are handled (the `disposition` server returns edit-based actions);
+// command-only actions are ignored.
+function codeActionApply(view, plugin, action) {
+  const edit = action.edit;
+  if (!edit) {
+    return;
+  }
+
+  const doc = view.state.doc;
+  const textEdits = [];
+  if (edit.changes && edit.changes[plugin.uri]) {
+    textEdits.push(...edit.changes[plugin.uri]);
+  }
+  if (Array.isArray(edit.documentChanges)) {
+    for (const change of edit.documentChanges) {
+      if (
+        change &&
+        change.textDocument &&
+        change.textDocument.uri === plugin.uri &&
+        Array.isArray(change.edits)
+      ) {
+        textEdits.push(...change.edits);
+      }
+    }
+  }
+  if (textEdits.length === 0) {
+    return;
+  }
+
+  // CodeMirror requires change specs sorted by `from`; LSP edits are
+  // non-overlapping but unordered.
+  const changes = textEdits
+    .map((textEdit) => ({
+      from: plugin.fromPosition(textEdit.range.start, doc),
+      to: plugin.fromPosition(textEdit.range.end, doc),
+      insert: textEdit.newText,
+    }))
+    .sort((a, b) => a.from - b.from);
+
+  // For a single edit (the common case, e.g. a list flow/block conversion),
+  // place the caret at the start of the rewritten list -- before the `[` of an
+  // inline list, or before the first `-` of a block list. Positions in a
+  // transaction's `selection` are relative to the post-change document, and a
+  // lone edit does not shift its own start, so the offset is `from` plus the
+  // marker's index within the inserted text.
+  let selection;
+  if (changes.length === 1) {
+    const markerIndex = listMarkerIndex(changes[0].insert);
+    if (markerIndex >= 0) {
+      selection = { anchor: changes[0].from + markerIndex };
+    }
+  }
+
+  view.dispatch(selection ? { changes, selection, scrollIntoView: true } : { changes });
+  view.focus();
+}
+
+// Index within `text` of a converted list's caret target: the `[` of an inline
+// list, or the first line-leading `-` of a block list. Returns `-1` when
+// neither is present (so the caret is left to its default mapping).
+function listMarkerIndex(text) {
+  const bracket = text.indexOf("[");
+  if (bracket >= 0) {
+    return bracket;
+  }
+  const blockItem = /(?:^|\n)([ \t]*)-/.exec(text);
+  return blockItem ? blockItem.index + blockItem[0].length - 1 : -1;
+}
+
 // The first message from Rust is always the init config.
 const config = await dioxus.recv();
 
@@ -510,6 +764,7 @@ const {
   indentWithTab,
   tags,
   LSPClient,
+  LSPPlugin,
   languageServerExtensions,
   // Map of bundled language factories keyed by name, e.g. `{ yaml, markdown }`.
   // Which languages are present depends on the enabled `lang-*` Cargo features.
@@ -645,6 +900,14 @@ if (config.lsp_uri) {
     }).connect(transport);
 
     extensions.push(client.plugin(config.lsp_uri));
+
+    // Bind `Mod-.` (Cmd-. on macOS, Ctrl-. elsewhere) to request code actions
+    // for the current selection and offer them in a menu.
+    if (config.code_actions) {
+      extensions.push(
+        keymap.of([{ key: "Mod-.", run: codeActionCommand, preventDefault: true }]),
+      );
+    }
   } catch (error) {
     console.warn("dioxus_codemirror: LSP client setup failed", error);
   }
