@@ -1,23 +1,51 @@
-# dioxus_codemirror
+# 📝 dioxus_codemirror
+
+[![Crates.io](https://img.shields.io/crates/v/dioxus_codemirror.svg)](https://crates.io/crates/dioxus_codemirror)
+[![docs.rs](https://img.shields.io/docsrs/dioxus_codemirror)](https://docs.rs/dioxus_codemirror)
+[![CI](https://github.com/azriel91/dioxus_codemirror/workflows/CI/badge.svg)](https://github.com/azriel91/dioxus_codemirror/actions/workflows/ci.yml)
 
 A Dioxus **web** component that wraps the [CodeMirror 6] editor, for use in
 Dioxus web applications.
 
-It supports:
+Demo: <https://azriel.im/dioxus_codemirror>.
 
-1. **Reacting to edits** -- a two-way bound `Signal<String>`.
-2. **Setting the value externally** -- writing the bound signal replaces the
-   editor's contents (with an echo-loop guard so the two stay in sync).
-3. **Connecting to an in-page LSP server** -- a transport bridge to a language
-   server running in the page (e.g. compiled to WASM), either synchronous or
-   async / worker-backed with server-pushed diagnostics.
+> [!NOTE]
+>
+> 🚧 This crate is new and not yet stable; its API may change between releases.
 
 No JavaScript build step is required: the component drives CodeMirror through a
-single long-lived `document::eval` channel (`code_mirror/glue.js`). CodeMirror
-itself is **vendored** as a Dioxus folder asset (`dioxus_codemirror/assets/codemirror/`),
-so there is no runtime CDN dependency.
+single long-lived `document::eval` channel. CodeMirror itself is **vendored** as
+a Dioxus folder asset, so there is no runtime CDN dependency.
+
+
+## Features
+
+<details open>
+
+* [x] Pure Rust build / no `node` dependency.
+* [x] Set / receive text via `Signal<String>`.
+* [x] Syntax highlighting per-language, feature-gated so you ship only what
+  you use.
+* [x] Light / dark / auto theme (auto follows `prefers-color-scheme`).
+* [x] In-page LSP bridge -- synchronous, or async / worker-backed.
+
+</details>
+
 
 ## Usage
+
+Add the following to `Cargo.toml`:
+
+```toml
+[dependencies]
+dioxus_codemirror = "0.1.0"
+
+# Select which language syntax highlighting you want to bundle. See
+# "Choosing languages" below. `lang-yaml` and `lang-markdown` shown here.
+dioxus_codemirror = { version = "0.1.0", features = ["lang-yaml", "lang-markdown"] }
+```
+
+In code:
 
 ```rust
 use dioxus::prelude::*;
@@ -43,14 +71,16 @@ The editor is always editable. Props:
 * `line_numbers: bool` -- show a line-number gutter (default `false`).
 * `language: Language` -- syntax highlighting (default plain text). The variant
   must have its `lang-*` Cargo feature enabled to be bundled; see
-  [Choosing languages](#choosing-languages). `Language::Yaml` and
-  `Language::Markdown` are on by default.
+  [Choosing languages](#choosing-languages). Selecting a `Language` whose feature
+  is disabled falls back to plain text (with a console warning) rather than
+  failing.
 * editor feature toggles (e.g. `allow_multiple_selections: bool`) -- optional
   CodeMirror features, off by default; see [Editor features](#editor-features).
 * `theme: Theme` -- color theme, `Theme::Auto` (default, follows the OS
   `prefers-color-scheme`), `Theme::Light`, or `Theme::Dark`.
 * `lsp: LspBridge` -- connect an in-page language server, synchronous or async
-  (optional).
+  (optional); see [LSP](#lsp).
+
 
 ## Editor features
 
@@ -64,7 +94,7 @@ use dioxus_codemirror::CodeMirror;
 rsx! {
     CodeMirror {
         value,
-        allow_multiple_selections: true,   // Alt-click, Mod-d / Mod-F2 cursors
+        allow_multiple_selections: true,   // Alt-click, Ctrl/Cmd-d / Ctrl/Cmd-F2 cursors
         highlight_selection_matches: true, // highlight other occurrences
         bracket_matching: true,
         close_brackets: true,
@@ -88,78 +118,6 @@ rsx! {
 | `read_only: bool` | `EditorState.readOnly` |
 | `tab_size: Option<u8>` | `EditorState.tabSize` |
 
-## Architecture
-
-```
-Rust (Dioxus / WASM)                       JS (document::eval, one per editor)
---------------------                       -----------------------------------
-CodeMirror component                       glue.js:
-  Signal<String> (two-way value)             - injects a module script: imports vendored CodeMirror
-  use_future: recv loop  <-- Evt (JSON) --   - EditorView + updateListener -> dioxus.send(Evt)
-  use_effect: value set  --- Cmd (JSON) -->   - command loop: await dioxus.recv() -> apply Cmd
-  Cmd enum (serialize)                         - LSP Transport bridges to/from Rust via Cmd/Evt
-  Evt enum (deserialize)
-```
-
-Messages are typed Rust enums (`Cmd` outbound, `Evt` inbound) serialized to JSON
-with a `type` tag -- the tag is the exact string the glue script dispatches on,
-so the wire protocol is compile-time-checked on the Rust side.
-
-## LSP
-
-`CodeMirror` takes an optional `LspBridge`, which connects the editor's
-`@codemirror/lsp-client` to an in-page language server. There are two transport
-flavours, chosen by which constructor you call:
-
-### Synchronous: `LspBridge::lsp_bridge_from_server`
-
-Drives an [`LspServer`] -- the extension point a real in-page language server
-implements (`fn lsp_message_handle(message) -> replies`). It is request/response:
-each message from the editor is handed to the server, and the messages it
-*returns* are forwarded straight back, within the component's message loop, so
-there is no round-trip latency through the render cycle. This covers requests
-(e.g. `initialize`, hover, completion) and notifications.
-
-The `example` ships a `MockLspServer` that returns canned JSON-RPC responses, so
-the round trip is demonstrable without a real server.
-
-### Async / worker-capable: `LspBridge::lsp_bridge_from_server_async`
-
-Drives an [`LspServerAsync`], for a server whose work does not complete within
-the call that receives a message -- one running in a **Web Worker** (or a real
-WASM server off the main thread), or one that emits **diagnostics** after a
-processing step.
-
-Instead of returning replies, the server is handed an `LspPusher` once (via
-`fn lsp_pusher_set(pusher)`) and pushes messages onto it whenever they are ready
-(`fn lsp_message_handle(message)` returns nothing). The component drains the
-receiving end and forwards each message to the editor, the same way prompted
-replies are. Because the push path is independent of any request, this is what
-makes **server-initiated, unprompted messages** work -- a server pushing
-`textDocument/publishDiagnostics` (lint/error squiggles) some time *after* a
-`didOpen`/`didChange`, rather than as the return value of handling a request.
-
-The `example` ships a `MockLspServerAsync` that pushes its responses and emits
-diagnostics on open/change. Replace either mock with your WASM language server to
-get genuine language features.
-
-## Running the example
-
-```sh
-dx serve --platform web -p example
-```
-
-The example shows five editors:
-
-1. **Plain editable text** -- type to edit; the mirrored text updates live.
-2. **YAML** with line numbers and highlighting.
-3. **Markdown** with line numbers and highlighting.
-4. **Set value externally + LSP** -- the **Set to template** button replaces the
-   contents, and the panel shows JSON-RPC flowing both ways to the (synchronous)
-   mock server.
-5. **Async LSP + server-pushed diagnostics** -- the async mock server pushes its
-   replies and emits `textDocument/publishDiagnostics` unprompted on
-   open/change; the panel shows the pushed JSON-RPC.
 
 ## Choosing languages
 
@@ -169,81 +127,74 @@ are never copied into the build output. Enable the ones you need:
 
 ```toml
 [dependencies]
-dioxus_codemirror = "..."
-
-# Select which language syntax highlighting you want to bundle.
-dioxus_codemirror = { version = "...", features = [
+dioxus_codemirror = { version = "0.1.0", features = [
     "lang-css",
     "lang-html",
 ] }
 
 # Or bundle everything:
-dioxus_codemirror = { version = "...", features = ["lang-all"] }
+dioxus_codemirror = { version = "0.1.0", features = ["lang-all"] }
 ```
 
 Available features: `lang-yaml`, `lang-markdown`, `lang-javascript`, `lang-css`,
-`lang-html`, and `lang-all`. Each matches a [`Language`] variant. Selecting a
-`Language` whose feature is disabled falls back to plain text (with a console
-warning) rather than failing.
+`lang-html`, and `lang-all`. Each matches a [`Language`] variant. No language is
+bundled by default; selecting a `Language` whose feature is disabled falls back
+to plain text (with a console warning) rather than failing.
 
-Selection is a build-time, crate-wide choice: `build.rs` reads which `lang-*`
-features are enabled and generates the served asset folder and its `index.js`
-entry accordingly. There is no per-component or runtime language configuration
-beyond the `language` prop choosing among the bundled set.
+Selection is a build-time, crate-wide choice. To add a language not listed
+above, see [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-To support a language not listed above, add an entry to `LANGUAGES` in
-`xtask/src/main.rs`, a matching `Language` variant, and a `lang-*` feature in
-`dioxus_codemirror/Cargo.toml`, then re-run the vendor command below.
 
-## Vendored CodeMirror assets
+## LSP
 
-CodeMirror and the full language superset are vendored into
-`dioxus_codemirror/assets/codemirror-vendor/` -- one ES module file per npm
-package, with each package's imports rewritten to its siblings, plus a
-`manifest.json` describing each language's file closure. This directory is
-committed but is **not** itself a Dioxus asset.
+`CodeMirror` takes an optional `LspBridge`, which connects the editor's
+`@codemirror/lsp-client` to an in-page language server. There are two transport
+flavours, chosen by which constructor you call:
 
-At build time, `dioxus_codemirror/build.rs` reads the manifest and copies only
-the files needed by the enabled `lang-*` features into
-`dioxus_codemirror/assets/codemirror/` (git-ignored, the actual Dioxus folder
-asset), generating a matching `index.js` entry. The glue script imports that
-single `index.js`.
+* **Synchronous** -- `LspBridge::lsp_bridge_from_server` drives an [`LspServer`],
+  the extension point a real in-page language server implements. It is
+  request/response: each message from the editor is handed to the server, and
+  the messages it *returns* are forwarded straight back.
 
-### Why a single `index.js` entry
+* **Async / worker-capable** -- `LspBridge::lsp_bridge_from_server_async` drives
+  an [`LspServerAsync`], for a server running in a **Web Worker** (or off the
+  main thread), or one that emits **diagnostics** after a processing step.
+  Instead of returning replies, the server pushes messages onto an `LspPusher`
+  whenever they are ready -- which is what makes **server-initiated, unprompted
+  messages** (e.g. `textDocument/publishDiagnostics`) work.
 
-The glue imports **only** `index.js`, which re-exports the symbols the component
-needs. This matters because Dioxus's asset pipeline runs esbuild over each `.js`
-file and *bundles* it -- inlining that file's imports. If the glue imported
-several entry files (`codemirror.js`, `codemirror__state.js`, ...) each would be
-bundled separately, loading **multiple copies of `@codemirror/state`**, which
-trips CodeMirror's "multiple instances of @codemirror/state" check in
-`EditorState.create`. Importing one entry means esbuild produces a single module
-graph with one shared `state` instance.
+The `example` ships mock servers for both flavours. Replace either mock with your
+WASM language server to get genuine language features. See
+[`DEVELOPMENT.md`](DEVELOPMENT.md) for the wire protocol and architecture.
 
-Consequence: at runtime only the (bundled) `index.js` is loaded; the other
-per-package files in the build output are build-time inputs for esbuild to bundle
-`index.js` from, and are never fetched directly by the browser. `build.rs` keeps
-that build-time input set minimal by copying only the files reachable from the
-enabled languages (see [Choosing languages](#choosing-languages)), so a disabled
-language's modules are not even present to be bundled.
 
-### Refreshing / upgrading versions
+## Development
 
-The `xtask` crate fetches the modules from [esm.sh] (no npm required) and
-rewrites their imports:
+See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the architecture, the message
+protocol, the vendored CodeMirror assets, and how to add a language.
+
+To run the bundled example:
 
 ```sh
-cargo run -p xtask -- vendor
+dx serve --platform web -p example
 ```
 
-Pinned versions live in `xtask/src/main.rs` (`package_spec`). Note the meta
-`codemirror` package must be pinned to an exact version -- esm.sh resolves
-`codemirror@6` to an unrelated CodeMirror 5 lineage. After changing a version
-there, re-run the command and commit the regenerated `assets/codemirror-vendor/`
-(the served `assets/codemirror/` is generated by `build.rs` and git-ignored).
+
+## License
+
+Licensed under either of
+
+* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or https://www.apache.org/licenses/LICENSE-2.0)
+* MIT license ([LICENSE-MIT](LICENSE-MIT) or https://opensource.org/licenses/MIT)
+
+at your option.
+
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
 
 [CodeMirror 6]: https://codemirror.net/
-[esm.sh]: https://esm.sh/
 [`Language`]: dioxus_codemirror/src/language.rs
 [`LspServer`]: dioxus_codemirror/src/lsp/lsp_server.rs
 [`LspServerAsync`]: dioxus_codemirror/src/lsp/lsp_server_async.rs
