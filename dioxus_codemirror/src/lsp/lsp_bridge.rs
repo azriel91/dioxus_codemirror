@@ -32,9 +32,7 @@ pub struct LspBridge {
     /// Handles a JSON-RPC message from the editor and returns the server's
     /// synchronous reply messages (often empty -- e.g. for notifications, or
     /// for an async server whose replies arrive later via
-    /// [`messages_pushed_rx`]).
-    ///
-    /// [`messages_pushed_rx`]: LspBridge::messages_pushed_rx
+    /// `LspBridge::messages_pushed_rx`).
     pub on_message_to_server: Callback<LspMessage, Vec<LspMessage>>,
     /// Receiver of server-pushed messages, drained once by the component.
     ///
