@@ -57,7 +57,7 @@ jobs:
           path: ~/.cargo/bin/cargo-about
           key: ${{ runner.os }}-cargo-about
 
-      - run: cargo install --locked cargo-about
+      - run: cargo install --locked cargo-about --features="cli"
         if: steps.cargo_about_cache_restore.outputs.cache-hit != 'true'
 
       - name: cargo-about cache save
