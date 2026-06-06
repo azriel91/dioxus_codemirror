@@ -12,7 +12,7 @@ export { SearchCursor } from "./codemirror__search.js";
 export { closeBrackets, closeBracketsKeymap } from "./codemirror__autocomplete.js";
 export { indentWithTab } from "./codemirror__commands.js";
 export { tags } from "./lezer__highlight.js";
-export { LSPClient, languageServerExtensions } from "./codemirror__lsp-client.js";
+export { LSPClient, LSPPlugin, languageServerExtensions } from "./codemirror__lsp-client.js";
 import { yaml } from "./codemirror__lang-yaml.js";
 import { markdown } from "./codemirror__lang-markdown.js";
 import { javascript } from "./codemirror__lang-javascript.js";

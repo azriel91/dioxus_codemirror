@@ -185,7 +185,8 @@ impl CodemirrorVendor {
         index_js.push_str("export { indentWithTab } from \"./codemirror__commands.js\";\n");
         index_js.push_str("export { tags } from \"./lezer__highlight.js\";\n");
         index_js.push_str(
-            "export { LSPClient, languageServerExtensions } from \"./codemirror__lsp-client.js\";\n",
+            "export { LSPClient, LSPPlugin, languageServerExtensions } \
+             from \"./codemirror__lsp-client.js\";\n",
         );
 
         for lang in LANGUAGES {
