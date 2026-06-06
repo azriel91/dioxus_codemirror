@@ -1,3 +1,14 @@
+[workspace.package]
+version = "0.1.0"
+authors = ["Azriel Hoh <azriel91@gmail.com>"]
+edition = "2024"
+homepage = "https://azriel.im/dioxus_codemirror"
+repository = "https://github.com/azriel91/dioxus_codemirror"
+readme = "README.md"
+categories = ["gui", "web-programming", "wasm"]
+keywords = ["dioxus", "codemirror", "editor", "wasm", "web"]
+license = "MIT OR Apache-2.0"
+
 [workspace]
 resolver = "3"
 members = [
@@ -6,15 +17,15 @@ members = [
     "xtask",
 ]
 
-[workspace.package]
-version = "0.1.0"
-edition = "2024"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/azriel91/dioxus_codemirror"
-
 [workspace.dependencies]
-dioxus_codemirror = { path = "dioxus_codemirror" }
-dioxus = { version = "0.7" }
+# dioxus_codemirror crates
+dioxus_codemirror = { path = "dioxus_codemirror", version = "0.1.0" }
+
+# external crates
+dioxus = "0.7"
 futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage_nightly)"] }
