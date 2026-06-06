@@ -2,3 +2,11 @@
 
 # CodeMirror module / symbol names
 "crosshairCursor" = "crosshairCursor"
+
+[files]
+extend-exclude = [
+  "dioxus_codemirror/assets/codemirror",
+  "dioxus_codemirror/assets/codemirror-vendor",
+  "dioxus_codemirror/assets/.codemirror-features",
+  "example/assets/licenses.html",
+]
