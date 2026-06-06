@@ -6,12 +6,13 @@ use serde::{Deserialize, Serialize};
 /// `languages` map, e.g. `Language::Yaml` becomes `"yaml"`. Each variant maps
 /// to a CodeMirror `@codemirror/lang-*` package.
 ///
-/// A language is only bundled when its matching `lang-*` Cargo feature is
-/// enabled on `dioxus_codemirror` (e.g. `Language::Css` needs `features =
-/// ["lang-css"]`). The defaults are [`Language::Yaml`] and
-/// [`Language::Markdown`]; selecting a language whose feature is disabled falls
-/// back to plain text (with a console warning) rather than failing. See the
-/// crate's `[features]` for the full list, or `lang-all` to bundle every one.
+/// Every language is currently bundled regardless of the enabled `lang-*` Cargo
+/// features: the whole vendored superset is served because Dioxus cannot yet
+/// serve a build-script-generated, per-feature asset folder (see
+/// <https://github.com/DioxusLabs/dioxus/issues/4426> and
+/// [`code_mirror`](crate::code_mirror)). Selecting any variant works; should the
+/// looked-up name be missing from the `languages` map, the glue falls back to
+/// plain text with a console warning rather than failing.
 ///
 /// [`CodeMirror`]: crate::code_mirror::CodeMirror
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

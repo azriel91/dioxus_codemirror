@@ -24,8 +24,7 @@ a Dioxus folder asset, so there is no runtime CDN dependency.
 
 * [x] Pure Rust build / no `node` dependency.
 * [x] Set / receive text via `Signal<String>`.
-* [x] Syntax highlighting per-language, feature-gated so you ship only what
-  you use.
+* [x] Syntax highlighting per-language (YAML, Markdown, JavaScript, CSS, HTML).
 * [x] Light / dark / auto theme (auto follows `prefers-color-scheme`).
 * [x] In-page LSP bridge -- synchronous, or async / worker-backed.
 
@@ -39,11 +38,11 @@ Add the following to `Cargo.toml`:
 ```toml
 [dependencies]
 dioxus_codemirror = "0.1.0"
-
-# Select which language syntax highlighting you want to bundle. See
-# "Choosing languages" below. `lang-yaml` and `lang-markdown` shown here.
-dioxus_codemirror = { version = "0.1.0", features = ["lang-yaml", "lang-markdown"] }
 ```
+
+All bundled languages (YAML, Markdown, JavaScript, CSS, HTML) are available out
+of the box. The `lang-*` Cargo features are currently no-ops; see
+[Choosing languages](#choosing-languages).
 
 In code:
 
@@ -69,11 +68,8 @@ The editor is always editable. Props:
 
 * `value: Signal<String>` -- two-way bound document text (required).
 * `line_numbers: bool` -- show a line-number gutter (default `false`).
-* `language: Language` -- syntax highlighting (default plain text). The variant
-  must have its `lang-*` Cargo feature enabled to be bundled; see
-  [Choosing languages](#choosing-languages). Selecting a `Language` whose feature
-  is disabled falls back to plain text (with a console warning) rather than
-  failing.
+* `language: Language` -- syntax highlighting (default plain text). All languages
+  are bundled; see [Choosing languages](#choosing-languages).
 * editor feature toggles (e.g. `allow_multiple_selections: bool`) -- optional
   CodeMirror features, off by default; see [Editor features](#editor-features).
 * `theme: Theme` -- color theme, `Theme::Auto` (default, follows the OS
@@ -124,28 +120,20 @@ rsx! {
 
 ## Choosing languages
 
-Each syntax-highlighting language is gated behind a `lang-*` Cargo feature, so a
-consumer ships only the languages they use -- the files for disabled languages
-are never copied into the build output. Enable the ones you need:
+Every supported language -- `Language::Yaml`, `Markdown`, `Javascript`, `Css`,
+`Html` -- is bundled and ready to use; no feature selection is required.
 
-```toml
-[dependencies]
-dioxus_codemirror = { version = "0.1.0", features = [
-    "lang-css",
-    "lang-html",
-] }
+The `lang-yaml`, `lang-markdown`, `lang-javascript`, `lang-css`, `lang-html`, and
+`lang-all` Cargo features still exist but are currently **no-ops**: the whole
+language superset is shipped regardless. This is because Dioxus cannot yet serve
+a build-script-generated, per-feature asset folder -- see
+[DioxusLabs/dioxus#4426]. Once that lands, the features will once again trim the
+shipped JS to only the languages you enable, so it is worth setting them now to
+match the languages you actually use.
 
-# Or bundle everything:
-dioxus_codemirror = { version = "0.1.0", features = ["lang-all"] }
-```
+To add a language not listed above, see [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-Available features: `lang-yaml`, `lang-markdown`, `lang-javascript`, `lang-css`,
-`lang-html`, and `lang-all`. Each matches a [`Language`] variant. No language is
-bundled by default; selecting a `Language` whose feature is disabled falls back
-to plain text (with a console warning) rather than failing.
-
-Selection is a build-time, crate-wide choice. To add a language not listed
-above, see [`DEVELOPMENT.md`](DEVELOPMENT.md).
+[DioxusLabs/dioxus#4426]: https://github.com/DioxusLabs/dioxus/issues/4426
 
 
 ## LSP

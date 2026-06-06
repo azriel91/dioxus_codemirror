@@ -16,7 +16,7 @@ pub enum Cmd {
     ///
     /// `mount_id`: the DOM id of the element the editor mounts into, e.g.
     /// `"cm-editor-0"`. `cm_base`: base URL of the vendored CodeMirror assets,
-    /// e.g. `"/assets/codemirror"`. `doc`: the initial document text.
+    /// e.g. `"/assets/codemirror-vendor"`. `doc`: the initial document text.
     /// `line_numbers`: whether to show the line-number gutter. `language`:
     /// syntax highlighting language, e.g. `Some(Language::Yaml)`, or `None` for
     /// plain text. The remaining flags toggle optional CodeMirror features (see

@@ -21,9 +21,12 @@ workspace = true
 
 [features]
 default = []
-# Each `lang-*` feature bundles one CodeMirror language. `build.rs` copies only
-# the files for the enabled languages into the served asset folder, so disabled
-# languages are never shipped to `dist`. Enable extras with, e.g.
+# Each `lang-*` feature names one CodeMirror language. These are currently
+# no-ops for the shipped JS: the whole language superset is always served,
+# because Dioxus cannot yet serve a build-script-generated, per-feature asset
+# folder -- see https://github.com/DioxusLabs/dioxus/issues/4426 and
+# `code_mirror.rs`. The features are kept so per-language trimming can return
+# once that lands. Enable extras with, e.g.
 # `dioxus_codemirror = { version = "...", features = ["lang-rust", "lang-css"] }`.
 lang-yaml = []
 lang-markdown = []
@@ -52,9 +55,5 @@ dioxus = { version = "0.7", default-features = false, features = [
     "asset",
 ] }
 futures = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-
-[build-dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }

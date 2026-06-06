@@ -19,7 +19,15 @@ static EDITOR_ID_NEXT: AtomicU64 = AtomicU64::new(0);
 
 /// Vendored CodeMirror modules, served as a folder so sibling imports between
 /// the modules resolve. Refresh with `cargo run -p xtask -- vendor`.
-const CM_ASSETS: Asset = asset!("/assets/codemirror", AssetOptions::folder());
+///
+/// The whole language superset is served, regardless of the enabled `lang-*`
+/// features: a folder asset must live inside the crate (manganis rejects paths
+/// outside `CARGO_MANIFEST_DIR`), and a build script may only write to
+/// `OUT_DIR`, so a per-feature folder generated at build time cannot be both
+/// written and served. See <https://github.com/DioxusLabs/dioxus/issues/4426>;
+/// once Dioxus can serve a generated asset, this can be trimmed to the enabled
+/// features again.
+const CM_ASSETS: Asset = asset!("/assets/codemirror-vendor", AssetOptions::folder());
 
 /// Properties for the [`CodeMirror`] component.
 #[derive(Props, Clone, PartialEq)]

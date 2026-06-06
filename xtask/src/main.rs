@@ -8,22 +8,20 @@
 //! cargo run -p xtask -- vendor
 //! ```
 //!
-//! Alongside the vendored modules it writes a `manifest.json` describing the
-//! file closure for the always-needed core and for each supported language.
-//! `dioxus_codemirror`'s `build.rs` reads that manifest and copies only the
-//! files for the enabled `lang-*` Cargo features into the served asset folder,
-//! generating a matching `index.js` entry. So adding a language here (vendored
-//! superset) is decoupled from which languages a consumer actually ships.
+//! Alongside the vendored modules it writes an `index.js` entry that re-exports
+//! the core symbols plus a `languages` map of every vendored language. That
+//! folder is served directly as the Dioxus asset (see `code_mirror.rs`): the
+//! whole superset ships, because Dioxus cannot yet serve a per-feature folder
+//! generated at build time -- <https://github.com/DioxusLabs/dioxus/issues/4426>.
 
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeSet, VecDeque},
     error::Error,
     fs,
     path::{Path, PathBuf},
 };
 
 use regex::Regex;
-use serde::Serialize;
 
 /// esm.sh origin.
 const ESM: &str = "https://esm.sh";
@@ -32,9 +30,9 @@ const OUT_DIR: &str = "dioxus_codemirror/assets/codemirror-vendor";
 
 /// Packages the glue script always needs, regardless of language.
 ///
-/// Their exported symbols are re-exported by every generated `index.js` (see
-/// `build.rs`), and their file closure is the manifest's `core` set. The
-/// crawler discovers transitive dependencies automatically.
+/// Their exported symbols are re-exported by the generated `index.js` (see
+/// [`CodemirrorVendor::index_js_write`]). The crawler discovers transitive
+/// dependencies automatically.
 const CORE_ENTRIES: &[&str] = &[
     "codemirror",
     "@codemirror/state",
@@ -48,11 +46,8 @@ const CORE_ENTRIES: &[&str] = &[
 ///
 /// `name` is the JS export symbol, the `Language` serde name, and the key in
 /// the generated `languages` map -- all the same lowercase string, e.g.
-/// `yaml`. `feature` is the Cargo feature that opts a consumer into shipping
-/// it, e.g. `lang-yaml`.
+/// `yaml`. Its Cargo feature is `lang-<name>`, e.g. `lang-yaml`.
 struct LanguageEntry {
-    /// Cargo feature that enables shipping this language, e.g. `lang-yaml`.
-    feature: &'static str,
     /// esm.sh package, e.g. `@codemirror/lang-yaml`.
     package: &'static str,
     /// JS export / `Language` serde name / `languages` map key, e.g. `yaml`.
@@ -65,56 +60,26 @@ struct LanguageEntry {
 /// feature) to support another language; re-run `cargo run -p xtask -- vendor`.
 const LANGUAGES: &[LanguageEntry] = &[
     LanguageEntry {
-        feature: "lang-yaml",
         package: "@codemirror/lang-yaml",
         name: "yaml",
     },
     LanguageEntry {
-        feature: "lang-markdown",
         package: "@codemirror/lang-markdown",
         name: "markdown",
     },
     LanguageEntry {
-        feature: "lang-javascript",
         package: "@codemirror/lang-javascript",
         name: "javascript",
     },
     LanguageEntry {
-        feature: "lang-css",
         package: "@codemirror/lang-css",
         name: "css",
     },
     LanguageEntry {
-        feature: "lang-html",
         package: "@codemirror/lang-html",
         name: "html",
     },
 ];
-
-/// Manifest describing the vendored superset, consumed by `build.rs`.
-#[derive(Serialize)]
-struct Manifest {
-    /// File stems always copied, e.g. `["codemirror", "codemirror__state"]`.
-    core: Vec<String>,
-    /// Per-language file closures, keyed by export name.
-    languages: Vec<LanguageManifest>,
-}
-
-/// Manifest entry for a single language.
-#[derive(Serialize)]
-struct LanguageManifest {
-    /// Export name / `languages` map key, e.g. `yaml`.
-    name: String,
-    /// Cargo feature that enables it, e.g. `lang-yaml`.
-    feature: String,
-    /// File stem of the entry module to import, e.g. `codemirror__lang-yaml`.
-    module: String,
-    /// JS export symbol to import from the entry module, e.g. `yaml`.
-    export: String,
-    /// File stems this language needs (its full closure, including shared core
-    /// files), e.g. `["codemirror__lang-yaml", "__lezer_yaml_..."]`.
-    files: Vec<String>,
-}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let task = std::env::args().nth(1);
@@ -138,15 +103,11 @@ struct CodemirrorVendor {
     import_regex: Regex,
 }
 
-/// Result of vendoring one module: its output stem and the sibling files it
-/// imports, recorded into the module graph for closure computation.
+/// Result of vendoring one module: its output stem and the modules it imports,
+/// enqueued so the crawler reaches the whole dependency closure.
 struct ModuleVendored {
-    /// Output file stem of this module, e.g. `codemirror__lang-yaml`.
-    out_stem: String,
     /// Modules to enqueue for crawling (bare names or absolute esm.sh paths).
     dep_modules: Vec<String>,
-    /// Output file stems this module imports, e.g. `["lezer__highlight"]`.
-    dep_stems: Vec<String>,
 }
 
 impl CodemirrorVendor {
@@ -168,15 +129,12 @@ impl CodemirrorVendor {
             .chain(LANGUAGES.iter().map(|lang| lang.package.to_string()))
             .collect();
         let mut done = BTreeSet::new();
-        // `out_stem` -> the output file stems it imports.
-        let mut module_graph: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
         while let Some(module) = queue.pop_front() {
             if !done.insert(module.clone()) {
                 continue;
             }
             let vendored = self.module_vendor(&module, &out_dir)?;
-            module_graph.insert(vendored.out_stem, vendored.dep_stems);
             for dep in vendored.dep_modules {
                 if !done.contains(&dep) {
                     queue.push_back(dep);
@@ -184,71 +142,72 @@ impl CodemirrorVendor {
             }
         }
 
-        self.manifest_write(&module_graph, &out_dir)?;
+        Self::index_js_write(&out_dir)?;
 
         println!("\nvendored {} modules into {OUT_DIR}", done.len());
         Ok(())
     }
 
-    /// Computes the file closures and writes `manifest.json`.
+    /// Writes the `index.js` entry served as the Dioxus folder asset.
     ///
-    /// `build.rs` reads this to copy only the files for the enabled `lang-*`
-    /// features into the served asset folder, so unselected languages are never
-    /// shipped to a consumer's `dist`.
-    fn manifest_write(
-        &self,
-        module_graph: &BTreeMap<String, Vec<String>>,
-        out_dir: &Path,
-    ) -> Result<(), Box<dyn Error>> {
-        let core_seeds: Vec<String> = CORE_ENTRIES
-            .iter()
-            .map(|entry| Self::file_stem(entry))
-            .collect();
-        let core: Vec<String> = Self::closure(module_graph, &core_seeds)
-            .into_iter()
-            .collect();
+    /// It re-exports the fixed core symbols and imports every vendored language
+    /// into a `languages` map keyed by name, which the glue script looks up. The
+    /// whole superset is included regardless of the enabled `lang-*` features;
+    /// see [`crate`] and <https://github.com/DioxusLabs/dioxus/issues/4426>.
+    fn index_js_write(out_dir: &Path) -> Result<(), Box<dyn Error>> {
+        let mut index_js = String::new();
+        index_js.push_str("// Generated by `cargo run -p xtask -- vendor`. Do not edit.\n");
+        index_js.push_str(
+            "//\n\
+             // Imports every vendored language. The whole superset ships because Dioxus\n\
+             // cannot yet serve a build-script-generated, per-feature asset folder from\n\
+             // `OUT_DIR` -- see https://github.com/DioxusLabs/dioxus/issues/4426. Once that\n\
+             // lands, this entry can be trimmed to the enabled `lang-*` features again.\n",
+        );
+        index_js.push_str("export { EditorView, minimalSetup } from \"./codemirror.js\";\n");
+        index_js.push_str(
+            "export { EditorState, EditorSelection, Annotation } from \"./codemirror__state.js\";\n",
+        );
+        index_js.push_str(
+            "export { lineNumbers, highlightActiveLineGutter, highlightActiveLine, \
+             highlightWhitespace, rectangularSelection, crosshairCursor, keymap, \
+             Decoration, ViewPlugin } \
+             from \"./codemirror__view.js\";\n",
+        );
+        index_js.push_str(
+            "export { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } \
+             from \"./codemirror__language.js\";\n",
+        );
+        index_js.push_str("export { SearchCursor } from \"./codemirror__search.js\";\n");
+        index_js.push_str(
+            "export { closeBrackets, closeBracketsKeymap } from \"./codemirror__autocomplete.js\";\n",
+        );
+        index_js.push_str("export { indentWithTab } from \"./codemirror__commands.js\";\n");
+        index_js.push_str("export { tags } from \"./lezer__highlight.js\";\n");
+        index_js.push_str(
+            "export { LSPClient, languageServerExtensions } from \"./codemirror__lsp-client.js\";\n",
+        );
 
-        let languages: Vec<LanguageManifest> = LANGUAGES
-            .iter()
-            .map(|lang| {
-                let module = Self::file_stem(lang.package);
-                let files = Self::closure(module_graph, std::slice::from_ref(&module))
-                    .into_iter()
-                    .collect();
-                LanguageManifest {
-                    name: lang.name.to_string(),
-                    feature: lang.feature.to_string(),
-                    module,
-                    export: lang.name.to_string(),
-                    files,
-                }
-            })
-            .collect();
-
-        let manifest = Manifest { core, languages };
-        let json = serde_json::to_string_pretty(&manifest)?;
-        fs::write(out_dir.join("manifest.json"), json)?;
-        println!("  manifest.json ({} languages)", LANGUAGES.len());
-        Ok(())
-    }
-
-    /// Transitive closure of `seeds` over `module_graph`, by output file stem.
-    fn closure(module_graph: &BTreeMap<String, Vec<String>>, seeds: &[String]) -> BTreeSet<String> {
-        let mut done = BTreeSet::new();
-        let mut queue: VecDeque<String> = seeds.iter().cloned().collect();
-        while let Some(stem) = queue.pop_front() {
-            if !done.insert(stem.clone()) {
-                continue;
-            }
-            if let Some(deps) = module_graph.get(&stem) {
-                for dep in deps {
-                    if !done.contains(dep) {
-                        queue.push_back(dep.clone());
-                    }
-                }
-            }
+        for lang in LANGUAGES {
+            index_js.push_str(&format!(
+                "import {{ {export} }} from \"./{module}.js\";\n",
+                export = lang.name,
+                module = Self::file_stem(lang.package),
+            ));
         }
-        done
+
+        index_js.push_str("export const languages = {");
+        for (index, lang) in LANGUAGES.iter().enumerate() {
+            if index > 0 {
+                index_js.push(',');
+            }
+            index_js.push_str(&format!(" {name}: {name}", name = lang.name));
+        }
+        index_js.push_str(" };\n");
+
+        fs::write(out_dir.join("index.js"), index_js)?;
+        println!("  index.js ({} languages)", LANGUAGES.len());
+        Ok(())
     }
 
     /// Downloads one `module`, rewrites its imports to sibling files, writes it
@@ -286,7 +245,6 @@ impl CodemirrorVendor {
         let mut code = Self::http_get(&fetch_url)?;
 
         let mut dep_modules = Vec::new();
-        let mut dep_stems = Vec::new();
         let specifiers: Vec<String> = self
             .import_regex
             .captures_iter(&code)
@@ -319,9 +277,6 @@ impl CodemirrorVendor {
             if !dep_modules.contains(&dep) {
                 dep_modules.push(dep);
             }
-            if !dep_stems.contains(&dep_stem) {
-                dep_stems.push(dep_stem.clone());
-            }
             let sibling = format!("./{dep_stem}.js");
             code = code
                 .replace(&format!("\"{specifier}\""), &format!("\"{sibling}\""))
@@ -331,11 +286,7 @@ impl CodemirrorVendor {
         let file_path = out_dir.join(format!("{out_stem}.js"));
         fs::write(&file_path, code)?;
         println!("  {module} -> {}", file_path.display());
-        Ok(ModuleVendored {
-            out_stem,
-            dep_modules,
-            dep_stems,
-        })
+        Ok(ModuleVendored { dep_modules })
     }
 
     /// Whether `specifier` looks like a real module specifier rather than a
