@@ -12,6 +12,7 @@ use crate::{
     language::Language,
     lsp::{lsp_bridge::LspBridge, lsp_message::LspMessage},
     theme::Theme,
+    theme_colors::ThemeColors,
 };
 
 /// Source counter for unique editor mount ids, e.g. `cm-editor-0`.
@@ -119,6 +120,12 @@ pub struct CodeMirrorProps {
     /// follows the operating system's `prefers-color-scheme`.
     #[props(default)]
     pub theme: Theme,
+    /// Per-editor CSS color overrides for the theme palette, applied on top of
+    /// the built-in light/dark defaults. Unset entries keep their defaults.
+    /// Emitted as inline CSS custom properties on this editor's mount element,
+    /// so they affect this editor only. Defaults to no overrides.
+    #[props(default)]
+    pub theme_colors: ThemeColors,
 }
 
 /// A CodeMirror 6 editor wrapped as a Dioxus web component.
@@ -148,7 +155,13 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
         rectangular_selection,
         tab_size,
         theme,
+        theme_colors,
     } = props;
+
+    // Inline CSS custom properties overriding the shared stylesheet's source
+    // palette variables for this editor only (`None` when there are no
+    // overrides, so the `style` attribute is omitted).
+    let theme_style = theme_colors.style_attr();
 
     let mount_id = use_hook(|| {
         format!(
@@ -282,6 +295,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
             id: "{mount_id}",
             class: "dioxus-codemirror",
             "data-theme": theme.theme_attr(),
+            style: theme_style,
         }
     }
 }

@@ -2,7 +2,7 @@ mod mock_lsp_server;
 mod mock_lsp_server_async;
 
 use dioxus::prelude::*;
-use dioxus_codemirror::{CodeMirror, Language, LspBridge, Theme};
+use dioxus_codemirror::{CodeMirror, Language, LspBridge, Theme, ThemeColor, ThemeColors};
 
 use crate::{mock_lsp_server::MockLspServer, mock_lsp_server_async::MockLspServerAsync};
 
@@ -85,6 +85,13 @@ fn App() -> Element {
                 highlight_whitespace: true,
                 line_numbers: true,
                 line_wrapping: true,
+                theme_colors: ThemeColors {
+                    selection_match_main: ThemeColor {
+                        light: Some("#aaeebb".to_string()),
+                        dark: Some("#115522".to_string()),
+                    },
+                    ..ThemeColors::default()
+                },
             }
             pre { "{value_plain}" }
         }
