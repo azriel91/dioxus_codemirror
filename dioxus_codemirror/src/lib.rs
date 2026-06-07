@@ -36,6 +36,8 @@ pub mod evt;
 pub mod language;
 pub mod lsp;
 pub mod theme;
+pub mod theme_color;
+pub mod theme_colors;
 
 pub use crate::{
     cmd::Cmd,
@@ -44,4 +46,6 @@ pub use crate::{
     language::Language,
     lsp::{LspBridge, LspMessage, LspMessageRx, LspPusher, LspServer, LspServerAsync},
     theme::Theme,
+    theme_color::ThemeColor,
+    theme_colors::ThemeColors,
 };
