@@ -522,6 +522,102 @@ function foldLevelKeymap() {
   return bindings;
 }
 
+// Keymap overriding the block fold / unfold keys with ancestor-aware variants.
+// It reuses `foldKeymap`'s key specs (including the macOS bindings) so the same
+// keys behave consistently, and is added before `foldKeymap` so it takes
+// precedence. Both commands return `false` when they find nothing to act on, so
+// `foldKeymap`'s default `foldCode` / `unfoldCode` still run as a fallback.
+function foldCursorKeymap() {
+  return [
+    { key: "Ctrl-Shift-[", mac: "Cmd-Alt-[", run: foldAtCursor, preventDefault: true },
+    { key: "Ctrl-Shift-]", mac: "Cmd-Alt-]", run: unfoldAtCursor, preventDefault: true },
+  ];
+}
+
+// Fold the foldable block at the cursor. If the cursor's own line is not
+// foldable, walk up to the nearest enclosing foldable ancestor and fold that, so
+// pressing the key from inside a block still folds the block. Returns `false`
+// when nothing foldable is found, letting the default `foldCode` binding run.
+function foldAtCursor(view) {
+  const { state } = view;
+  const effects = [];
+  const seen = new Set();
+  for (const range of state.selection.ranges) {
+    const foldRange = foldableAncestor(state, range.head);
+    if (foldRange && !seen.has(foldRange.from)) {
+      seen.add(foldRange.from);
+      effects.push(foldEffect.of(foldRange));
+    }
+  }
+  if (!effects.length) {
+    return false;
+  }
+  view.dispatch({ effects });
+  return true;
+}
+
+// Nearest foldable range at or enclosing `pos`: the cursor line if it is
+// foldable, otherwise the closest line above whose foldable range still covers
+// `pos`. Returns `null` when there is none.
+function foldableAncestor(state, pos) {
+  const line = state.doc.lineAt(pos);
+  const ownRange = foldable(state, line.from, line.to);
+  if (ownRange) {
+    return ownRange;
+  }
+  for (let number = line.number - 1; number >= 1; number -= 1) {
+    const ancestor = state.doc.line(number);
+    const range = foldable(state, ancestor.from, ancestor.to);
+    if (range && range.to >= pos) {
+      return range;
+    }
+  }
+  return null;
+}
+
+// Unfold the folded block on the cursor's line and move the caret onto the first
+// foldable child revealed, so the next fold key collapses a child rather than
+// the same block again. Returns `false` when no fold sits on the cursor line,
+// letting the default `unfoldCode` binding run.
+function unfoldAtCursor(view) {
+  const { state } = view;
+  const line = state.doc.lineAt(state.selection.main.head);
+
+  let target = null;
+  foldedRanges(state).between(line.from, line.to, (from, to) => {
+    target = { from, to };
+    return false;
+  });
+  if (!target) {
+    return false;
+  }
+
+  const transaction = { effects: unfoldEffect.of(target) };
+  const child = foldableFirstChild(state, target.from, target.to);
+  if (child !== null) {
+    transaction.selection = EditorSelection.cursor(child);
+    transaction.scrollIntoView = true;
+  }
+  view.dispatch(transaction);
+  return true;
+}
+
+// Position of the text start (after indentation) of the first foldable line
+// within the range (`from`, `to`), or `null` when the block has no foldable
+// descendant.
+function foldableFirstChild(state, from, to) {
+  const startLine = state.doc.lineAt(from);
+  const endLine = state.doc.lineAt(to);
+  for (let number = startLine.number + 1; number <= endLine.number; number += 1) {
+    const line = state.doc.line(number);
+    if (foldable(state, line.from, line.to)) {
+      const leading = line.text.length - line.text.trimStart().length;
+      return line.from + leading;
+    }
+  }
+  return null;
+}
+
 // View plugin that marks every visible occurrence of the actively selected text
 // with the `cm-selectionMatch` class -- the selected range included. This is
 // used instead of CodeMirror's `highlightSelectionMatches`, which never marks
@@ -827,6 +923,8 @@ const {
   codeFolding,
   foldable,
   foldEffect,
+  unfoldEffect,
+  foldedRanges,
   unfoldAll,
   indentUnit,
   SearchCursor,
@@ -911,12 +1009,15 @@ if (config.indent_on_input) {
 if (config.code_folding) {
   // `codeFolding` (the fold state field) is pushed explicitly: this component
   // builds on `minimalSetup`, not `basicSetup`, so the field is not otherwise
-  // present. `foldGutter` adds the clickable arrows; `foldKeymap` binds
-  // fold / unfold of the block at the cursor and fold-all / unfold-all; the
-  // `foldLevelKeymap` chords fold by indentation level (see their definition).
+  // present. `foldGutter` adds the clickable arrows. `foldCursorKeymap` overrides
+  // the block fold / unfold keys with ancestor-aware variants, and precedes
+  // `foldKeymap` so it wins for those keys while `foldKeymap` still supplies
+  // fold-all / unfold-all. The `foldLevelKeymap` chords fold by indentation
+  // level (see their definitions).
   extensions.push(
     codeFolding(),
     foldGutter(),
+    keymap.of(foldCursorKeymap()),
     keymap.of(foldKeymap),
     keymap.of(foldLevelKeymap()),
   );
