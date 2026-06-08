@@ -166,7 +166,8 @@ impl CodemirrorVendor {
         );
         index_js.push_str("export { EditorView, minimalSetup } from \"./codemirror.js\";\n");
         index_js.push_str(
-            "export { EditorState, EditorSelection, Annotation } from \"./codemirror__state.js\";\n",
+            "export { EditorState, EditorSelection, Annotation, Prec } \
+             from \"./codemirror__state.js\";\n",
         );
         index_js.push_str(
             "export { lineNumbers, highlightActiveLineGutter, highlightActiveLine, \
@@ -184,7 +185,10 @@ impl CodemirrorVendor {
         index_js.push_str(
             "export { closeBrackets, closeBracketsKeymap } from \"./codemirror__autocomplete.js\";\n",
         );
-        index_js.push_str("export { indentWithTab } from \"./codemirror__commands.js\";\n");
+        index_js.push_str(
+            "export { indentWithTab, moveLineUp, moveLineDown } \
+             from \"./codemirror__commands.js\";\n",
+        );
         index_js.push_str("export { tags } from \"./lezer__highlight.js\";\n");
         index_js.push_str(
             "export { LSPClient, LSPPlugin, languageServerExtensions } \

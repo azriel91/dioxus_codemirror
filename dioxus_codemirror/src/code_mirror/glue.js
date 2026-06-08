@@ -556,23 +556,94 @@ function foldAtCursor(view) {
   return true;
 }
 
-// Nearest foldable range at or enclosing `pos`: the cursor line if it is
-// foldable, otherwise the closest line above whose foldable range still covers
-// `pos`. Returns `null` when there is none.
+// Nearest foldable range at or enclosing `pos` that is not already folded: the
+// cursor line if it is foldable, otherwise the closest line above whose foldable
+// range still covers `pos`. Already-folded ranges are skipped, so pressing the
+// key on an already-folded block folds its closest unfolded ancestor instead.
+// Returns `null` when there is none.
 function foldableAncestor(state, pos) {
   const line = state.doc.lineAt(pos);
   const ownRange = foldable(state, line.from, line.to);
-  if (ownRange) {
+  if (ownRange && !foldRangeIsFolded(state, ownRange)) {
     return ownRange;
   }
   for (let number = line.number - 1; number >= 1; number -= 1) {
     const ancestor = state.doc.line(number);
     const range = foldable(state, ancestor.from, ancestor.to);
-    if (range && range.to >= pos) {
+    if (range && range.to >= pos && !foldRangeIsFolded(state, range)) {
       return range;
     }
   }
   return null;
+}
+
+// Whether the foldable `range` is currently folded, matched by its start: a
+// folded range beginning at `range.from` means this block is collapsed. Nested
+// folded children (which start elsewhere) do not count.
+function foldRangeIsFolded(state, range) {
+  let folded = false;
+  foldedRanges(state).between(range.from, range.to, (from) => {
+    if (from === range.from) {
+      folded = true;
+      return false;
+    }
+  });
+  return folded;
+}
+
+// Alt-ArrowUp / Alt-ArrowDown move the selected line(s). The built-in commands
+// move only the document lines under the selection, so a collapsed fold on the
+// line is left behind. When a fold sits on the selection, expand the moved block
+// to cover the fold's full line span, capture the built-in move over that block,
+// and replay its changes with the original selection -- the fold state maps
+// through the document changes, so the folded code travels with its header.
+// Returns `false` when no fold is involved, letting the default command run.
+function moveLineWithFold(view, forward) {
+  const { state } = view;
+  const folded = foldedRanges(state);
+
+  let expanded = false;
+  const blocks = state.selection.ranges.map((range) => {
+    const fromLine = state.doc.lineAt(range.from);
+    const toLine = state.doc.lineAt(range.to);
+    let from = fromLine.from;
+    let to = toLine.to;
+    folded.between(fromLine.from, toLine.to, (foldFrom, foldTo) => {
+      from = Math.min(from, state.doc.lineAt(foldFrom).from);
+      to = Math.max(to, state.doc.lineAt(foldTo).to);
+    });
+    if (from !== fromLine.from || to !== toLine.to) {
+      expanded = true;
+    }
+    return EditorSelection.range(from, to);
+  });
+  if (!expanded) {
+    return false;
+  }
+
+  const command = forward ? moveLineDown : moveLineUp;
+  const expandedState = state.update({
+    selection: EditorSelection.create(blocks, state.selection.mainIndex),
+  }).state;
+
+  let moved = null;
+  command({
+    state: expandedState,
+    dispatch: (transaction) => {
+      moved = transaction;
+    },
+  });
+  if (!moved) {
+    return false;
+  }
+
+  view.dispatch({
+    changes: moved.changes,
+    selection: state.selection.map(moved.changes),
+    scrollIntoView: true,
+    userEvent: "move.line",
+  });
+  return true;
 }
 
 // Unfold the folded block on the cursor's line and move the caret onto the first
@@ -905,6 +976,7 @@ const {
   EditorState,
   EditorSelection,
   Annotation,
+  Prec,
   lineNumbers,
   highlightActiveLineGutter,
   highlightActiveLine,
@@ -931,6 +1003,8 @@ const {
   closeBrackets,
   closeBracketsKeymap,
   indentWithTab,
+  moveLineUp,
+  moveLineDown,
   tags,
   LSPClient,
   LSPPlugin,
@@ -1014,9 +1088,18 @@ if (config.code_folding) {
   // `foldKeymap` so it wins for those keys while `foldKeymap` still supplies
   // fold-all / unfold-all. The `foldLevelKeymap` chords fold by indentation
   // level (see their definitions).
+  // `Prec.high` lifts the line-move override above `minimalSetup`'s default
+  // keymap so the folded body travels with its header line (see
+  // `moveLineWithFold`); the default `moveLineUp` / `moveLineDown` otherwise win.
   extensions.push(
     codeFolding(),
     foldGutter(),
+    Prec.high(
+      keymap.of([
+        { key: "Alt-ArrowUp", run: (view) => moveLineWithFold(view, false) },
+        { key: "Alt-ArrowDown", run: (view) => moveLineWithFold(view, true) },
+      ]),
+    ),
     keymap.of(foldCursorKeymap()),
     keymap.of(foldKeymap),
     keymap.of(foldLevelKeymap()),
