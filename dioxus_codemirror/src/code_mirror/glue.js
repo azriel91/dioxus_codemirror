@@ -541,18 +541,31 @@ function foldCursorKeymap() {
 function foldAtCursor(view) {
   const { state } = view;
   const effects = [];
+  const selection = [];
   const seen = new Set();
   for (const range of state.selection.ranges) {
     const foldRange = foldableAncestor(state, range.head);
-    if (foldRange && !seen.has(foldRange.from)) {
-      seen.add(foldRange.from);
-      effects.push(foldEffect.of(foldRange));
+    if (foldRange) {
+      if (!seen.has(foldRange.from)) {
+        seen.add(foldRange.from);
+        effects.push(foldEffect.of(foldRange));
+      }
+      // Move the caret to just before the folded range (the end of the header
+      // line, where the collapsed placeholder sits) so it is not left buried
+      // inside the fold -- otherwise a later line move would shift the hidden
+      // caret instead of the whole block.
+      selection.push(EditorSelection.cursor(foldRange.from));
+    } else {
+      selection.push(range);
     }
   }
   if (!effects.length) {
     return false;
   }
-  view.dispatch({ effects });
+  view.dispatch({
+    effects,
+    selection: EditorSelection.create(selection, state.selection.mainIndex),
+  });
   return true;
 }
 
@@ -682,11 +695,16 @@ function foldableFirstChild(state, from, to) {
   for (let number = startLine.number + 1; number <= endLine.number; number += 1) {
     const line = state.doc.line(number);
     if (foldable(state, line.from, line.to)) {
-      const leading = line.text.length - line.text.trimStart().length;
-      return line.from + leading;
+      return lineTextStart(line);
     }
   }
   return null;
+}
+
+// Document offset of the first non-whitespace character of `line` (its text
+// start); the line start for a blank or all-whitespace line.
+function lineTextStart(line) {
+  return line.from + (line.text.length - line.text.trimStart().length);
 }
 
 // View plugin that marks every visible occurrence of the actively selected text
