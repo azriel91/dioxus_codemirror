@@ -60,6 +60,19 @@ pub struct CodeMirrorProps {
     /// without it. Defaults to `false`.
     #[props(default)]
     pub code_actions: bool,
+    /// Enable code folding, mapping to `codeFolding` plus a fold gutter and the
+    /// fold keymaps. Adds clickable fold arrows in the gutter and binds:
+    ///
+    /// - `Ctrl-Shift-[` / `Ctrl-Shift-]` (Cmd-Alt-[ / Cmd-Alt-] on macOS) to
+    ///   fold / unfold the block at the cursor.
+    /// - `Ctrl-Alt-[` / `Ctrl-Alt-]` to fold / unfold every block.
+    /// - The chord `Mod-K Mod-1` (then `Mod-2`, `Mod-3`, up to `Mod-5`) to fold
+    ///   all blocks at that indentation level, and `Mod-K Mod-J` to unfold all
+    ///   (`Mod` is Cmd on macOS, Ctrl elsewhere).
+    ///
+    /// Defaults to `false`.
+    #[props(default)]
+    pub code_folding: bool,
     /// Highlight the line the primary cursor is on, mapping to
     /// `highlightActiveLine`. Defaults to `false`.
     #[props(default)]
@@ -141,6 +154,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
         bracket_matching,
         close_brackets,
         code_actions,
+        code_folding,
         highlight_active_line,
         highlight_selection_matches,
         highlight_whitespace,
@@ -194,6 +208,7 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                 bracket_matching,
                 close_brackets,
                 code_actions,
+                code_folding,
                 highlight_active_line,
                 highlight_selection_matches,
                 highlight_whitespace,

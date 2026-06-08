@@ -175,7 +175,8 @@ impl CodemirrorVendor {
              from \"./codemirror__view.js\";\n",
         );
         index_js.push_str(
-            "export { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } \
+            "export { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput, \
+             foldGutter, foldKeymap, codeFolding, foldable, foldEffect, unfoldAll, indentUnit } \
              from \"./codemirror__language.js\";\n",
         );
         index_js.push_str("export { SearchCursor } from \"./codemirror__search.js\";\n");

@@ -7,7 +7,7 @@
 export { EditorView, minimalSetup } from "./codemirror.js";
 export { EditorState, EditorSelection, Annotation } from "./codemirror__state.js";
 export { lineNumbers, highlightActiveLineGutter, highlightActiveLine, highlightWhitespace, rectangularSelection, crosshairCursor, keymap, Decoration, ViewPlugin } from "./codemirror__view.js";
-export { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput } from "./codemirror__language.js";
+export { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput, foldGutter, foldKeymap, codeFolding, foldable, foldEffect, unfoldAll, indentUnit } from "./codemirror__language.js";
 export { SearchCursor } from "./codemirror__search.js";
 export { closeBrackets, closeBracketsKeymap } from "./codemirror__autocomplete.js";
 export { indentWithTab } from "./codemirror__commands.js";

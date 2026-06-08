@@ -458,6 +458,70 @@ function selectAllMatches(view) {
   return true;
 }
 
+// Fold every foldable block whose start line sits at indentation depth `level`
+// (1 = outermost). Unfolds first so the outcome is deterministic regardless of
+// the current fold state. CodeMirror has no built-in "fold to level" command, so
+// this mirrors `foldAll`'s line walk but keeps only the ranges at the requested
+// depth. Returns `true` so it counts as a handled keybinding.
+function foldToLevel(view, level) {
+  unfoldAll(view);
+  const { state } = view;
+  const unitStr = state.facet(indentUnit);
+  const unitWidth =
+    unitStr === "\t" ? state.tabSize : unitStr.length || state.tabSize;
+
+  const effects = [];
+  for (let pos = 0; pos <= state.doc.length; ) {
+    const line = state.doc.lineAt(pos);
+    const range = foldable(state, line.from, line.to);
+    if (range) {
+      const indentCols = foldIndentColumnsCount(line.text, state.tabSize);
+      const lineLevel = Math.floor(indentCols / unitWidth) + 1;
+      if (lineLevel === level) {
+        effects.push(foldEffect.of(range));
+      }
+    }
+    pos = line.to + 1;
+  }
+  if (effects.length) {
+    view.dispatch({ effects });
+  }
+  return true;
+}
+
+// Visual column count of the leading whitespace of `text`, expanding tabs to the
+// next `tab_size` boundary so mixed tabs and spaces map to a consistent depth.
+function foldIndentColumnsCount(text, tabSize) {
+  let cols = 0;
+  for (const ch of text) {
+    if (ch === "\t") {
+      cols += tabSize - (cols % tabSize);
+    } else if (ch === " ") {
+      cols += 1;
+    } else {
+      break;
+    }
+  }
+  return cols;
+}
+
+// Chord keymap for level-based folding: `Mod-K Mod-<n>` folds to indentation
+// level n (1 through 5) and `Mod-K Mod-J` unfolds all. CodeMirror keymaps
+// support space-separated chords natively (`Mod` is Cmd on macOS, Ctrl else).
+function foldLevelKeymap() {
+  const bindings = [
+    { key: "Mod-k Mod-j", run: unfoldAll, preventDefault: true },
+  ];
+  for (let level = 1; level <= 5; level += 1) {
+    bindings.push({
+      key: `Mod-k Mod-${level}`,
+      run: (view) => foldToLevel(view, level),
+      preventDefault: true,
+    });
+  }
+  return bindings;
+}
+
 // View plugin that marks every visible occurrence of the actively selected text
 // with the `cm-selectionMatch` class -- the selected range included. This is
 // used instead of CodeMirror's `highlightSelectionMatches`, which never marks
@@ -758,6 +822,13 @@ const {
   syntaxHighlighting,
   bracketMatching,
   indentOnInput,
+  foldGutter,
+  foldKeymap,
+  codeFolding,
+  foldable,
+  foldEffect,
+  unfoldAll,
+  indentUnit,
   SearchCursor,
   closeBrackets,
   closeBracketsKeymap,
@@ -836,6 +907,19 @@ if (config.rectangular_selection) {
 }
 if (config.indent_on_input) {
   extensions.push(indentOnInput());
+}
+if (config.code_folding) {
+  // `codeFolding` (the fold state field) is pushed explicitly: this component
+  // builds on `minimalSetup`, not `basicSetup`, so the field is not otherwise
+  // present. `foldGutter` adds the clickable arrows; `foldKeymap` binds
+  // fold / unfold of the block at the cursor and fold-all / unfold-all; the
+  // `foldLevelKeymap` chords fold by indentation level (see their definition).
+  extensions.push(
+    codeFolding(),
+    foldGutter(),
+    keymap.of(foldKeymap),
+    keymap.of(foldLevelKeymap()),
+  );
 }
 if (config.highlight_whitespace) {
   extensions.push(highlightWhitespace());
