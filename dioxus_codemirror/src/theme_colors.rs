@@ -50,6 +50,9 @@ pub struct ThemeColors {
     pub active_line: ThemeColor,
     /// Active line gutter background. CSS var `--dxcm-active-line-gutter-bg`.
     pub active_line_gutter_bg: ThemeColor,
+    /// Active line background while a selection is drawn (a slightly darker
+    /// shade of `selection_focused`). CSS var `--dxcm-active-line-selected`.
+    pub active_line_selected: ThemeColor,
     /// Borders / focus outline. CSS var `--dxcm-border`.
     pub border: ThemeColor,
     /// Tooltip background. CSS var `--dxcm-tooltip-bg`.
@@ -95,7 +98,7 @@ impl ThemeColors {
     /// Single source of truth mapping each field to its CSS variable, e.g.
     /// `("syntax-keyword", &self.syntax_keyword)`. The suffixes must match the
     /// `THEME_PALETTE` names in `code_mirror/glue.js`.
-    fn entries(&self) -> [(&'static str, &ThemeColor); 30] {
+    fn entries(&self) -> [(&'static str, &ThemeColor); 31] {
         [
             ("bg", &self.bg),
             ("fg", &self.fg),
@@ -109,6 +112,7 @@ impl ThemeColors {
             ("highlight-space", &self.highlight_space),
             ("active-line", &self.active_line),
             ("active-line-gutter-bg", &self.active_line_gutter_bg),
+            ("active-line-selected", &self.active_line_selected),
             ("border", &self.border),
             ("tooltip-bg", &self.tooltip_bg),
             ("tooltip-fg", &self.tooltip_fg),
