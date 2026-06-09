@@ -37,7 +37,7 @@ Add the following to `Cargo.toml`:
 
 ```toml
 [dependencies]
-dioxus_codemirror = "0.1.0"
+dioxus_codemirror = "0.3.1"
 ```
 
 All bundled languages (YAML, Markdown, JavaScript, CSS, HTML) are available out
@@ -104,6 +104,8 @@ rsx! {
 | `allow_multiple_selections` | Allows multiple selections in the editor. Also binds `Ctrl/Cmd-d` to select the next match and `Ctrl/Cmd-F2` to select all matches. |
 | `bracket_matching` | Highlight the bracket matching the one next to the cursor. |
 | `close_brackets` | Auto-insert closing brackets and quotes. |
+| `code_actions` | Enable code actions (`Ctrl/Cmd-.`). |
+| `code_folding` | Enable code folding (`Ctrl/Cmd-Shift-[`, `Ctrl/Cmd-Shift-]`). |
 | `highlight_active_line` | Highlight the line the primary cursor is on. |
 | `highlight_selection_matches` | Highlight every occurrence of the selected text, the selection included. |
 | `highlight_whitespace` | Render whitespace characters visibly. |
