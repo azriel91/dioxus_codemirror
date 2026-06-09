@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Azriel Hoh <azriel91@gmail.com>"]
 edition = "2024"
 homepage = "https://azriel.im/dioxus_codemirror"
@@ -19,7 +19,7 @@ members = [
 
 [workspace.dependencies]
 # dioxus_codemirror crates
-dioxus_codemirror = { path = "dioxus_codemirror", version = "0.2.0" }
+dioxus_codemirror = { path = "dioxus_codemirror", version = "0.3.0" }
 
 # external crates
 dioxus = "0.7"

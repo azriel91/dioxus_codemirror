@@ -1,6 +1,6 @@
 # Changelog
 
-## unreleased
+## 0.3.0 (2026-06-09)
 
 * Support code folding. ([#4][#4])
 
