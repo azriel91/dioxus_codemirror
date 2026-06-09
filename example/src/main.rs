@@ -38,8 +38,10 @@ fn main() {
 #[component]
 fn App() -> Element {
     let value_plain = use_signal(|| "Edit me -- plain text, fully editable.\n".to_string());
-    let value_yaml =
-        use_signal(|| "name: example\nversion: 0.1.0\nitems:\n  - one\n  - two\n".to_string());
+    let value_yaml = use_signal(|| {
+        "name: example\nversion: 0.1.0\nservices:\n  web:\n    image: nginx\n    ports:\n      - 80\n      - 443\n  db:\n    image: postgres\n    env:\n      POSTGRES_USER: admin\n      POSTGRES_DB: example\n"
+            .to_string()
+    });
     let value_markdown =
         use_signal(|| "# Title\n\nSome **bold** and _italic_ text.\n\n- a\n- b\n".to_string());
     // Drives the YAML editor's `theme` prop below. `Theme::Auto` (the default)
@@ -97,10 +99,14 @@ fn App() -> Element {
         }
 
         section {
-            h2 { "2. YAML with line numbers" }
+            h2 { "2. YAML with line numbers + code folding" }
             p {
                 "The editor themes itself for light and dark automatically. Use the "
-                "buttons to override the OS color scheme for this editor."
+                "buttons to override the OS color scheme for this editor. Code "
+                "folding is on: click the gutter arrows, or use Ctrl/Cmd-Shift-[ "
+                "and ] to fold/unfold the block at the cursor, Ctrl/Cmd-K then "
+                "Ctrl/Cmd-1/2/3 to fold to an indentation level, and Ctrl/Cmd-K "
+                "then Ctrl/Cmd-J to unfold all."
             }
             div {
                 button { onclick: move |_| theme_yaml.set(Theme::Auto), "Auto" }
@@ -112,6 +118,7 @@ fn App() -> Element {
                 allow_multiple_selections: true,
                 bracket_matching: true,
                 close_brackets: true,
+                code_folding: true,
                 highlight_active_line: true,
                 highlight_selection_matches: true,
                 highlight_whitespace: true,

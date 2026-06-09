@@ -34,6 +34,7 @@ pub enum Cmd {
         bracket_matching: bool,
         close_brackets: bool,
         code_actions: bool,
+        code_folding: bool,
         highlight_active_line: bool,
         highlight_selection_matches: bool,
         highlight_whitespace: bool,
