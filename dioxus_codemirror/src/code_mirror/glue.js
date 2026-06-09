@@ -555,30 +555,42 @@ function foldCursorKeymap() {
 
 // Fold the block at the cursor, or the selected characters. A non-empty
 // selection folds exactly the selected range (not the foldable ancestor), so
-// any run of characters can be collapsed. A bare cursor folds the foldable
-// block on its line, walking up to the nearest enclosing foldable ancestor when
-// the line itself is not foldable, so pressing the key from inside a block
-// still folds the block. Returns `false` when nothing foldable is found,
-// letting the default `foldCode` binding run.
+// any run of characters can be collapsed; a selection that is already exactly
+// folded (the fold key pressed again) folds the nearest unfolded ancestor
+// instead, so repeated presses keep contracting. A bare cursor folds the
+// foldable block on its line, walking up to the nearest enclosing foldable
+// ancestor when the line itself is not foldable, so pressing the key from
+// inside a block still folds the block. Each folded range is left selected
+// (see the selection comment below), so the unfold key expands exactly these
+// ranges -- fold and unfold toggle. Returns `false` when nothing foldable is
+// found, letting the default `foldCode` binding run.
 function foldAtCursor(view) {
   const { state } = view;
   const effects = [];
   const selection = [];
   const seen = new Set();
   for (const range of state.selection.ranges) {
-    const foldRange = range.empty
-      ? foldableAncestor(state, range.head)
-      : foldRangeForSelection(state, range);
+    let foldRange;
+    if (range.empty) {
+      foldRange = foldableAncestor(state, range.head);
+    } else {
+      foldRange = foldRangeForSelection(state, range);
+      if (foldRange && foldRangeIsFolded(state, foldRange)) {
+        foldRange = foldableAncestor(state, foldRange.from);
+      }
+    }
     if (foldRange) {
       if (!seen.has(foldRange.from)) {
         seen.add(foldRange.from);
         effects.push(foldEffect.of(foldRange));
       }
-      // Move the caret to just before the folded range (the end of the header
-      // line, where the collapsed placeholder sits) so it is not left buried
-      // inside the fold -- otherwise a later line move would shift the hidden
-      // caret instead of the whole block.
-      selection.push(EditorSelection.cursor(foldRange.from));
+      // Select the folded range with the head at the fold start (on the
+      // visible header line, where the collapsed placeholder sits): the unfold
+      // key then targets exactly this range, and the head sits on the fold
+      // boundary rather than strictly inside it (which would auto-unfold) or
+      // buried where a later line move would shift the hidden caret instead of
+      // the whole block.
+      selection.push(EditorSelection.range(foldRange.to, foldRange.from));
     } else {
       selection.push(range);
     }
@@ -770,8 +782,9 @@ function unfoldAtCursor(view) {
     }
     view.dispatch({
       effects: targets.map((target) => unfoldEffect.of(target)),
+      // Head at the range start, matching the selection `foldAtCursor` leaves.
       selection: EditorSelection.create(
-        targets.map(({ from, to }) => EditorSelection.range(from, to)),
+        targets.map(({ from, to }) => EditorSelection.range(to, from)),
       ),
       scrollIntoView: true,
     });

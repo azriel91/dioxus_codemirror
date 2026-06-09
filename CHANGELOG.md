@@ -7,6 +7,7 @@
 * The active line within a selection uses the new `active_line_selected` theme colour, so it reads as selected instead of hiding the selection. ([#5][#5])
 * `Ctrl + Shift + ]` with a selection unfolds all folds inside it, leaving each unfolded range selected. ([#5][#5])
 * `Ctrl + Shift + [` with a selection folds exactly the selected characters. ([#5][#5])
+* Folding selects the folded range(s), so `Ctrl + Shift + [` / `Ctrl + Shift + ]` toggle between contracting and expanding them. ([#5][#5])
 
 [#5]: https://github.com/azriel91/dioxus_codemirror/pull/5
 
