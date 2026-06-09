@@ -5,8 +5,8 @@
 // `OUT_DIR` -- see https://github.com/DioxusLabs/dioxus/issues/4426. Once that
 // lands, this entry can be trimmed to the enabled `lang-*` features again.
 export { EditorView, minimalSetup } from "./codemirror.js";
-export { EditorState, EditorSelection, Annotation, Prec } from "./codemirror__state.js";
-export { lineNumbers, highlightActiveLineGutter, highlightActiveLine, highlightWhitespace, rectangularSelection, crosshairCursor, keymap, Decoration, ViewPlugin } from "./codemirror__view.js";
+export { EditorState, EditorSelection, Annotation, Prec, RangeSet } from "./codemirror__state.js";
+export { lineNumbers, highlightActiveLineGutter, highlightActiveLine, highlightWhitespace, rectangularSelection, crosshairCursor, keymap, Decoration, ViewPlugin, layer, RectangleMarker, GutterMarker, gutterLineClass } from "./codemirror__view.js";
 export { HighlightStyle, syntaxHighlighting, bracketMatching, indentOnInput, foldGutter, foldKeymap, codeFolding, foldable, foldEffect, unfoldEffect, foldedRanges, unfoldAll, indentUnit } from "./codemirror__language.js";
 export { SearchCursor } from "./codemirror__search.js";
 export { closeBrackets, closeBracketsKeymap } from "./codemirror__autocomplete.js";

@@ -102,6 +102,7 @@ const THEME_PALETTE = [
   { name: "highlight-space", light: "#d0d3d6", dark: "#363b42" },
   { name: "active-line", light: "#f0f3f6", dark: "#161b22" },
   { name: "active-line-gutter-bg", light: "#eaeef2", dark: "#161b22" },
+  { name: "active-line-selected", light: "#94b6f2", dark: "#345887" },
   { name: "border", light: "#d0d7de", dark: "#30363d" },
   { name: "tooltip-bg", light: "#ffffff", dark: "#161b22" },
   { name: "tooltip-fg", light: "#1f2328", dark: "#e6edf3" },
@@ -188,21 +189,28 @@ ${themeActivate("dark")}
 .dioxus-codemirror .cm-dropCursor {
   border-left-color: var(--dxcm-caret);
 }
-/* Selection background, drawn by \`drawSelection\` as \`.cm-selectionBackground\`
-   layers. CodeMirror's base theme styles these with high-specificity selectors
+/* Selection rects are drawn by the rounded-corner layer
+   (\`selectionLayerRounded\`, container \`.cm-dxcm-selectionLayer\`). The built-in
+   \`drawSelection\` layer stays enabled (it also hides the native selection) but
+   its rects are made transparent so only the rounded ones show. CodeMirror's
+   base theme styles those with high-specificity selectors
    (\`&light.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground\`,
    ~5 classes) and keys light/dark off its own \`darkTheme\` facet -- which we do
    not set, so it would always apply its light colors regardless of our scheme.
-   We therefore match its structure (and add \`.cm-editor\` to outweigh it) so our
-   variables win in both focus states and both schemes. */
+   We therefore match its structure (and add \`.cm-editor\` to outweigh it) in
+   both focus states. */
 .dioxus-codemirror .cm-selectionLayer .cm-selectionBackground,
+.dioxus-codemirror .cm-editor.cm-focused .cm-scroller .cm-selectionLayer .cm-selectionBackground {
+  background: transparent;
+}
+.dioxus-codemirror .cm-dxcm-selectionLayer .cm-selectionBackground,
 .dioxus-codemirror .cm-content ::selection {
   background: var(--dxcm-selection);
 }
 .dioxus-codemirror .cm-editor .cm-scroller .cm-highlightSpace {
   background-image: radial-gradient(circle at 50% 55%, var(--dxcm-highlight-space) 20%, transparent 5%);
 }
-.dioxus-codemirror .cm-editor.cm-focused .cm-scroller .cm-selectionLayer .cm-selectionBackground {
+.dioxus-codemirror .cm-editor.cm-focused .cm-scroller .cm-dxcm-selectionLayer .cm-selectionBackground {
   background: var(--dxcm-selection-focused);
 }
 /* Occurrences of the selected text, marked by \`selectionMatchHighlighter\` and
@@ -223,6 +231,15 @@ ${themeActivate("dark")}
 }
 .dioxus-codemirror .cm-activeLine {
   background: var(--dxcm-active-line);
+}
+/* Active line while a selection is drawn. The line's opaque background renders
+   above the selection layer, so it would hide the selection on the caret line,
+   leaving a pale "hole" in a multi-line selection. \`selectionLayerRounded\`
+   renders \`.cm-selectionBackground\` rects only while a selection is non-empty,
+   so \`:has()\` scopes this color -- a slightly darker shade of the focused
+   selection -- to exactly that state. */
+.dioxus-codemirror .cm-editor.cm-focused:has(.cm-dxcm-selectionLayer .cm-selectionBackground) .cm-activeLine {
+  background: var(--dxcm-active-line-selected);
 }
 .dioxus-codemirror .cm-activeLineGutter {
   background: var(--dxcm-active-line-gutter-bg);
@@ -458,6 +475,14 @@ function selectAllMatches(view) {
   return true;
 }
 
+// Scroll the view by one line in the given direction, keeping the caret where
+// it is (which may scroll it out of view). Bound to `Ctrl-ArrowUp` /
+// `Ctrl-ArrowDown`.
+function scrollByLine(view, forward) {
+  view.scrollDOM.scrollTop += (forward ? 1 : -1) * view.defaultLineHeight;
+  return true;
+}
+
 // Fold every foldable block whose start line sits at indentation depth `level`
 // (1 = outermost). Unfolds first so the outcome is deterministic regardless of
 // the current fold state. CodeMirror has no built-in "fold to level" command, so
@@ -522,10 +547,11 @@ function foldLevelKeymap() {
   return bindings;
 }
 
-// Keymap overriding the block fold / unfold keys with ancestor-aware variants.
-// It reuses `foldKeymap`'s key specs (including the macOS bindings) so the same
-// keys behave consistently, and is added before `foldKeymap` so it takes
-// precedence. Both commands return `false` when they find nothing to act on, so
+// Keymap overriding the block fold / unfold keys with selection- and
+// ancestor-aware variants (see `foldAtCursor` / `unfoldAtCursor`). It reuses
+// `foldKeymap`'s key specs (including the macOS bindings) so the same keys
+// behave consistently, and is added before `foldKeymap` so it takes precedence.
+// Both commands return `false` when they find nothing to act on, so
 // `foldKeymap`'s default `foldCode` / `unfoldCode` still run as a fallback.
 function foldCursorKeymap() {
   return [
@@ -534,27 +560,44 @@ function foldCursorKeymap() {
   ];
 }
 
-// Fold the foldable block at the cursor. If the cursor's own line is not
-// foldable, walk up to the nearest enclosing foldable ancestor and fold that, so
-// pressing the key from inside a block still folds the block. Returns `false`
-// when nothing foldable is found, letting the default `foldCode` binding run.
+// Fold the block at the cursor, or the selected characters. A non-empty
+// selection folds exactly the selected range (not the foldable ancestor), so
+// any run of characters can be collapsed; a selection that is already exactly
+// folded (the fold key pressed again) folds the nearest unfolded ancestor
+// instead, so repeated presses keep contracting. A bare cursor folds the
+// foldable block on its line, walking up to the nearest enclosing foldable
+// ancestor when the line itself is not foldable, so pressing the key from
+// inside a block still folds the block. Each folded range is left selected
+// (see the selection comment below), so the unfold key expands exactly these
+// ranges -- fold and unfold toggle. Returns `false` when nothing foldable is
+// found, letting the default `foldCode` binding run.
 function foldAtCursor(view) {
   const { state } = view;
   const effects = [];
   const selection = [];
   const seen = new Set();
   for (const range of state.selection.ranges) {
-    const foldRange = foldableAncestor(state, range.head);
+    let foldRange;
+    if (range.empty) {
+      foldRange = foldableAncestor(state, range.head);
+    } else {
+      foldRange = foldRangeForSelection(state, range);
+      if (foldRange && foldRangeIsFolded(state, foldRange)) {
+        foldRange = foldableAncestor(state, foldRange.from);
+      }
+    }
     if (foldRange) {
       if (!seen.has(foldRange.from)) {
         seen.add(foldRange.from);
         effects.push(foldEffect.of(foldRange));
       }
-      // Move the caret to just before the folded range (the end of the header
-      // line, where the collapsed placeholder sits) so it is not left buried
-      // inside the fold -- otherwise a later line move would shift the hidden
-      // caret instead of the whole block.
-      selection.push(EditorSelection.cursor(foldRange.from));
+      // Select the folded range with the head at the fold start (on the
+      // visible header line, where the collapsed placeholder sits): the unfold
+      // key then targets exactly this range, and the head sits on the fold
+      // boundary rather than strictly inside it (which would auto-unfold) or
+      // buried where a later line move would shift the hidden caret instead of
+      // the whole block.
+      selection.push(EditorSelection.range(foldRange.to, foldRange.from));
     } else {
       selection.push(range);
     }
@@ -567,6 +610,21 @@ function foldAtCursor(view) {
     selection: EditorSelection.create(selection, state.selection.mainIndex),
   });
   return true;
+}
+
+// Exact fold range for the selected characters: the selection itself, less the
+// trailing newline when the selection ends at a line start -- full-line
+// selections commonly end at the next line's column 0, and the fold should not
+// swallow that newline. Returns `null` when the trim leaves the range empty
+// (e.g. a selection of just a newline).
+function foldRangeForSelection(state, range) {
+  const { from } = range;
+  let { to } = range;
+  const line = state.doc.lineAt(to);
+  if (to === line.from && to > from) {
+    to = state.doc.line(line.number - 1).to;
+  }
+  return to > from ? { from, to } : null;
 }
 
 // Nearest foldable range at or enclosing `pos` that is not already folded: the
@@ -602,6 +660,49 @@ function foldRangeIsFolded(state, range) {
     }
   });
   return folded;
+}
+
+// ArrowLeft / ArrowRight (and their Shift variants) with the caret on the edge
+// of a folded range: move the caret across the fold instead of one character
+// into it. The fold state auto-unfolds any range the caret enters, so the
+// default char motion would expand the fold. `forward` is the arrow direction;
+// `extend` keeps the anchor (Shift held). Cursors not on a fold edge mirror the
+// default char motion so a multi-cursor arrow press stays uniform. Returns
+// `false` when no caret sits on a fold edge, letting the default motion run.
+function foldSkip(view, forward, extend) {
+  const { state } = view;
+  const folded = foldedRanges(state);
+
+  let skipped = false;
+  const ranges = state.selection.ranges.map((range) => {
+    // A plain arrow on a non-empty range collapses it to its side, never
+    // entering a fold, so only extension and bare cursors check fold edges.
+    if (!extend && !range.empty) {
+      return EditorSelection.cursor(forward ? range.to : range.from);
+    }
+    let dest = null;
+    folded.between(range.head, range.head, (from, to) => {
+      if (forward ? from === range.head : to === range.head) {
+        dest = forward ? to : from;
+        return false;
+      }
+    });
+    if (dest === null) {
+      dest = view.moveByChar(EditorSelection.cursor(range.head), forward).head;
+    } else {
+      skipped = true;
+    }
+    return extend ? EditorSelection.range(range.anchor, dest) : EditorSelection.cursor(dest);
+  });
+  if (!skipped) {
+    return false;
+  }
+  view.dispatch({
+    selection: EditorSelection.create(ranges, state.selection.mainIndex),
+    scrollIntoView: true,
+    userEvent: "select",
+  });
+  return true;
 }
 
 // Alt-ArrowUp / Alt-ArrowDown move the selected line(s). The built-in commands
@@ -659,12 +760,44 @@ function moveLineWithFold(view, forward) {
   return true;
 }
 
-// Unfold the folded block on the cursor's line and move the caret onto the first
-// foldable child revealed, so the next fold key collapses a child rather than
-// the same block again. Returns `false` when no fold sits on the cursor line,
-// letting the default `unfoldCode` binding run.
+// Unfold the folds under the selection or cursor. A non-empty selection
+// unfolds every folded range it overlaps and leaves each unfolded range
+// selected, so the fold key immediately refolds exactly those ranges (multiple
+// resulting ranges require `allow_multiple_selections`; without it only the
+// main range survives). A bare cursor unfolds the folded block on its line and
+// moves the caret onto the first foldable child revealed, so the next fold key
+// collapses a child rather than the same block again. Returns `false` when no
+// fold is found, letting the default `unfoldCode` binding run.
 function unfoldAtCursor(view) {
   const { state } = view;
+  if (state.selection.ranges.some((range) => !range.empty)) {
+    const folded = foldedRanges(state);
+    const targets = [];
+    const seen = new Set();
+    for (const range of state.selection.ranges) {
+      folded.between(range.from, range.to, (from, to) => {
+        // `between` also reports folds merely touching the selection edge;
+        // only folds properly overlapping the selection are meant.
+        if (to > range.from && from < range.to && !seen.has(from)) {
+          seen.add(from);
+          targets.push({ from, to });
+        }
+      });
+    }
+    if (!targets.length) {
+      return false;
+    }
+    view.dispatch({
+      effects: targets.map((target) => unfoldEffect.of(target)),
+      // Head at the range start, matching the selection `foldAtCursor` leaves.
+      selection: EditorSelection.create(
+        targets.map(({ from, to }) => EditorSelection.range(to, from)),
+      ),
+      scrollIntoView: true,
+    });
+    return true;
+  }
+
   const line = state.doc.lineAt(state.selection.main.head);
 
   let target = null;
@@ -759,6 +892,139 @@ function selectionMatchHighlighter() {
     },
     { decorations: (plugin) => plugin.decorations },
   );
+}
+
+// View plugin that marks only the main selection head's line with
+// `cm-activeLine`, replacing CodeMirror's `highlightActiveLine` (which marks
+// every selection head's line): with multiple selections, only the main one
+// reads as "the" active line, and the other selections keep just their text
+// rect highlight.
+function activeLineMainHighlighter() {
+  const lineDeco = Decoration.line({ class: "cm-activeLine" });
+  const compute = (view) => {
+    const line = view.state.doc.lineAt(view.state.selection.main.head);
+    return Decoration.set([lineDeco.range(line.from)]);
+  };
+  return ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.decorations = compute(view);
+      }
+      update(update) {
+        if (update.docChanged || update.selectionSet) {
+          this.decorations = compute(update.view);
+        }
+      }
+    },
+    { decorations: (plugin) => plugin.decorations },
+  );
+}
+
+// Gutter counterpart of `activeLineMainHighlighter`, replacing CodeMirror's
+// `highlightActiveLineGutter` for the same reason: only the main selection
+// head's gutter element gets `cm-activeLineGutter`.
+function activeLineGutterMainHighlighter() {
+  const marker = new (class extends GutterMarker {
+    elementClass = "cm-activeLineGutter";
+  })();
+  return gutterLineClass.compute(["selection"], (state) => {
+    const line = state.doc.lineAt(state.selection.main.head);
+    return RangeSet.of([marker.range(line.from)]);
+  });
+}
+
+// Corner radius of the selection rects drawn by `selectionLayerRounded`.
+const SELECTION_RECT_RADIUS = "4px";
+
+// Layer marker wrapping a `RectangleMarker` with a per-corner border radius
+// (a CSS `border-radius` shorthand, e.g. `"4px 4px 0 0"`).
+class RoundedRectMarker {
+  constructor(base, radii) {
+    this.base = base;
+    this.radii = radii;
+  }
+  draw() {
+    const elt = this.base.draw();
+    elt.style.borderRadius = this.radii;
+    return elt;
+  }
+  update(elt, prev) {
+    if (!this.base.update(elt, prev.base)) {
+      return false;
+    }
+    elt.style.borderRadius = this.radii;
+    return true;
+  }
+  eq(other) {
+    return this.radii === other.radii && this.base.eq(other.base);
+  }
+}
+
+// Selection layer drawing the same per-line rects as CodeMirror's
+// `drawSelection` (whose rects the stylesheet hides), but with the selection
+// shape's convex corners rounded: the first and last characters of the first
+// and last lines, and -- where consecutive lines start or end at different
+// columns -- the corners of the step between them. Concave corners (where a
+// neighbouring line's rect overhangs) stay square, as CSS cannot round inward.
+function selectionLayerRounded() {
+  return layer({
+    above: false,
+    class: "cm-dxcm-selectionLayer",
+    update: (update) =>
+      update.docChanged ||
+      update.selectionSet ||
+      update.viewportChanged ||
+      update.geometryChanged,
+    markers: (view) => {
+      const markers = [];
+      for (const range of view.state.selection.ranges) {
+        if (!range.empty) {
+          markers.push(...RectangleMarker.forRange(view, "cm-selectionBackground", range));
+        }
+      }
+      return selectionMarkersRound(markers);
+    },
+  });
+}
+
+// Wraps each selection `RectangleMarker` in a `RoundedRectMarker` whose
+// corners are rounded only where the selection shape is convex. A corner is
+// convex when no vertically adjacent rect covers the corner's x position and
+// no rect on the same row touches that edge (rects from all selection ranges
+// are considered together, so touching selections stay seamless).
+function selectionMarkersRound(markers) {
+  const eps = 1.5;
+  // `width === null` means the rect extends to the editor's right edge.
+  const rects = markers.map((marker) => ({
+    left: marker.left,
+    right: marker.width === null ? Number.MAX_SAFE_INTEGER : marker.left + marker.width,
+    top: marker.top,
+    bottom: marker.top + marker.height,
+  }));
+  const cornerCovered = (others, x) =>
+    others.some((other) => other.left - eps <= x && x <= other.right + eps);
+  return markers.map((marker, index) => {
+    const rect = rects[index];
+    const above = rects.filter(
+      (other) => other !== rect && Math.abs(other.bottom - rect.top) < eps,
+    );
+    const below = rects.filter(
+      (other) => other !== rect && Math.abs(other.top - rect.bottom) < eps,
+    );
+    const row = rects.filter((other) => other !== rect && Math.abs(other.top - rect.top) < eps);
+    const leftTouched = row.some((other) => Math.abs(other.right - rect.left) < eps);
+    const rightTouched = row.some((other) => Math.abs(other.left - rect.right) < eps);
+    const corners = [
+      !cornerCovered(above, rect.left) && !leftTouched, // top-left
+      !cornerCovered(above, rect.right) && !rightTouched, // top-right
+      !cornerCovered(below, rect.right) && !rightTouched, // bottom-right
+      !cornerCovered(below, rect.left) && !leftTouched, // bottom-left
+    ];
+    const radii = corners
+      .map((rounded) => (rounded ? SELECTION_RECT_RADIUS : "0"))
+      .join(" ");
+    return new RoundedRectMarker(marker, radii);
+  });
 }
 
 // The currently open code-action menu's teardown handle, or `null`. Only one
@@ -995,15 +1261,18 @@ const {
   EditorSelection,
   Annotation,
   Prec,
+  RangeSet,
   lineNumbers,
-  highlightActiveLineGutter,
-  highlightActiveLine,
   highlightWhitespace,
   rectangularSelection,
   crosshairCursor,
   keymap,
   Decoration,
   ViewPlugin,
+  layer,
+  RectangleMarker,
+  GutterMarker,
+  gutterLineClass,
   HighlightStyle,
   syntaxHighlighting,
   bracketMatching,
@@ -1052,10 +1321,25 @@ const extensions = [
       dioxus.send({ type: "doc_changed", doc: update.state.doc.toString() });
     }
   }),
+  // Scroll the view by one line, keeping the caret in place. Bound to `Ctrl`
+  // explicitly (not `Mod`) so macOS `Cmd-ArrowUp` / `Cmd-ArrowDown` (document
+  // start / end) keep their meaning. `Prec.high` lifts the bindings above
+  // `minimalSetup`'s default keymap.
+  Prec.high(
+    keymap.of([
+      { key: "Ctrl-ArrowUp", run: (view) => scrollByLine(view, false) },
+      { key: "Ctrl-ArrowDown", run: (view) => scrollByLine(view, true) },
+    ]),
+  ),
+  // Selection rects with rounded convex corners, replacing the look of
+  // `minimalSetup`'s `drawSelection` layer (whose rects the stylesheet makes
+  // transparent; the layer itself stays, as it also hides the native
+  // selection).
+  selectionLayerRounded(),
 ];
 
 if (config.line_numbers) {
-  extensions.push(lineNumbers(), highlightActiveLineGutter());
+  extensions.push(lineNumbers(), activeLineGutterMainHighlighter());
 }
 
 // === Optional editor features === //
@@ -1078,7 +1362,7 @@ if (config.allow_multiple_selections) {
   );
 }
 if (config.highlight_active_line) {
-  extensions.push(highlightActiveLine());
+  extensions.push(activeLineMainHighlighter());
 }
 if (config.highlight_selection_matches) {
   // Highlight all occurrences of the selected text, the selection included
@@ -1106,9 +1390,10 @@ if (config.code_folding) {
   // `foldKeymap` so it wins for those keys while `foldKeymap` still supplies
   // fold-all / unfold-all. The `foldLevelKeymap` chords fold by indentation
   // level (see their definitions).
-  // `Prec.high` lifts the line-move override above `minimalSetup`'s default
-  // keymap so the folded body travels with its header line (see
-  // `moveLineWithFold`); the default `moveLineUp` / `moveLineDown` otherwise win.
+  // `Prec.high` lifts the arrow-key overrides above `minimalSetup`'s default
+  // keymap, which binds the same keys: Alt-Up / Alt-Down so the folded body
+  // travels with its header line (see `moveLineWithFold`), and Left / Right so
+  // the caret jumps across a fold instead of expanding it (see `foldSkip`).
   extensions.push(
     codeFolding(),
     foldGutter(),
@@ -1116,6 +1401,10 @@ if (config.code_folding) {
       keymap.of([
         { key: "Alt-ArrowUp", run: (view) => moveLineWithFold(view, false) },
         { key: "Alt-ArrowDown", run: (view) => moveLineWithFold(view, true) },
+        { key: "ArrowLeft", run: (view) => foldSkip(view, false, false) },
+        { key: "ArrowRight", run: (view) => foldSkip(view, true, false) },
+        { key: "Shift-ArrowLeft", run: (view) => foldSkip(view, false, true) },
+        { key: "Shift-ArrowRight", run: (view) => foldSkip(view, true, true) },
       ]),
     ),
     keymap.of(foldCursorKeymap()),

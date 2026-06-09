@@ -166,13 +166,14 @@ impl CodemirrorVendor {
         );
         index_js.push_str("export { EditorView, minimalSetup } from \"./codemirror.js\";\n");
         index_js.push_str(
-            "export { EditorState, EditorSelection, Annotation, Prec } \
+            "export { EditorState, EditorSelection, Annotation, Prec, RangeSet } \
              from \"./codemirror__state.js\";\n",
         );
         index_js.push_str(
             "export { lineNumbers, highlightActiveLineGutter, highlightActiveLine, \
              highlightWhitespace, rectangularSelection, crosshairCursor, keymap, \
-             Decoration, ViewPlugin } \
+             Decoration, ViewPlugin, layer, RectangleMarker, GutterMarker, \
+             gutterLineClass } \
              from \"./codemirror__view.js\";\n",
         );
         index_js.push_str(
