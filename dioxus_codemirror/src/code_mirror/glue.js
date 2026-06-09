@@ -189,21 +189,28 @@ ${themeActivate("dark")}
 .dioxus-codemirror .cm-dropCursor {
   border-left-color: var(--dxcm-caret);
 }
-/* Selection background, drawn by \`drawSelection\` as \`.cm-selectionBackground\`
-   layers. CodeMirror's base theme styles these with high-specificity selectors
+/* Selection rects are drawn by the rounded-corner layer
+   (\`selectionLayerRounded\`, container \`.cm-dxcm-selectionLayer\`). The built-in
+   \`drawSelection\` layer stays enabled (it also hides the native selection) but
+   its rects are made transparent so only the rounded ones show. CodeMirror's
+   base theme styles those with high-specificity selectors
    (\`&light.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground\`,
    ~5 classes) and keys light/dark off its own \`darkTheme\` facet -- which we do
    not set, so it would always apply its light colors regardless of our scheme.
-   We therefore match its structure (and add \`.cm-editor\` to outweigh it) so our
-   variables win in both focus states and both schemes. */
+   We therefore match its structure (and add \`.cm-editor\` to outweigh it) in
+   both focus states. */
 .dioxus-codemirror .cm-selectionLayer .cm-selectionBackground,
+.dioxus-codemirror .cm-editor.cm-focused .cm-scroller .cm-selectionLayer .cm-selectionBackground {
+  background: transparent;
+}
+.dioxus-codemirror .cm-dxcm-selectionLayer .cm-selectionBackground,
 .dioxus-codemirror .cm-content ::selection {
   background: var(--dxcm-selection);
 }
 .dioxus-codemirror .cm-editor .cm-scroller .cm-highlightSpace {
   background-image: radial-gradient(circle at 50% 55%, var(--dxcm-highlight-space) 20%, transparent 5%);
 }
-.dioxus-codemirror .cm-editor.cm-focused .cm-scroller .cm-selectionLayer .cm-selectionBackground {
+.dioxus-codemirror .cm-editor.cm-focused .cm-scroller .cm-dxcm-selectionLayer .cm-selectionBackground {
   background: var(--dxcm-selection-focused);
 }
 /* Occurrences of the selected text, marked by \`selectionMatchHighlighter\` and
@@ -227,11 +234,11 @@ ${themeActivate("dark")}
 }
 /* Active line while a selection is drawn. The line's opaque background renders
    above the selection layer, so it would hide the selection on the caret line,
-   leaving a pale "hole" in a multi-line selection. \`drawSelection\` renders
-   \`.cm-selectionBackground\` rects only while the selection is non-empty, so
-   \`:has()\` scopes this color -- a slightly darker shade of the focused
+   leaving a pale "hole" in a multi-line selection. \`selectionLayerRounded\`
+   renders \`.cm-selectionBackground\` rects only while a selection is non-empty,
+   so \`:has()\` scopes this color -- a slightly darker shade of the focused
    selection -- to exactly that state. */
-.dioxus-codemirror .cm-editor.cm-focused:has(.cm-selectionLayer .cm-selectionBackground) .cm-activeLine {
+.dioxus-codemirror .cm-editor.cm-focused:has(.cm-dxcm-selectionLayer .cm-selectionBackground) .cm-activeLine {
   background: var(--dxcm-active-line-selected);
 }
 .dioxus-codemirror .cm-activeLineGutter {
@@ -887,6 +894,139 @@ function selectionMatchHighlighter() {
   );
 }
 
+// View plugin that marks only the main selection head's line with
+// `cm-activeLine`, replacing CodeMirror's `highlightActiveLine` (which marks
+// every selection head's line): with multiple selections, only the main one
+// reads as "the" active line, and the other selections keep just their text
+// rect highlight.
+function activeLineMainHighlighter() {
+  const lineDeco = Decoration.line({ class: "cm-activeLine" });
+  const compute = (view) => {
+    const line = view.state.doc.lineAt(view.state.selection.main.head);
+    return Decoration.set([lineDeco.range(line.from)]);
+  };
+  return ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.decorations = compute(view);
+      }
+      update(update) {
+        if (update.docChanged || update.selectionSet) {
+          this.decorations = compute(update.view);
+        }
+      }
+    },
+    { decorations: (plugin) => plugin.decorations },
+  );
+}
+
+// Gutter counterpart of `activeLineMainHighlighter`, replacing CodeMirror's
+// `highlightActiveLineGutter` for the same reason: only the main selection
+// head's gutter element gets `cm-activeLineGutter`.
+function activeLineGutterMainHighlighter() {
+  const marker = new (class extends GutterMarker {
+    elementClass = "cm-activeLineGutter";
+  })();
+  return gutterLineClass.compute(["selection"], (state) => {
+    const line = state.doc.lineAt(state.selection.main.head);
+    return RangeSet.of([marker.range(line.from)]);
+  });
+}
+
+// Corner radius of the selection rects drawn by `selectionLayerRounded`.
+const SELECTION_RECT_RADIUS = "4px";
+
+// Layer marker wrapping a `RectangleMarker` with a per-corner border radius
+// (a CSS `border-radius` shorthand, e.g. `"4px 4px 0 0"`).
+class RoundedRectMarker {
+  constructor(base, radii) {
+    this.base = base;
+    this.radii = radii;
+  }
+  draw() {
+    const elt = this.base.draw();
+    elt.style.borderRadius = this.radii;
+    return elt;
+  }
+  update(elt, prev) {
+    if (!this.base.update(elt, prev.base)) {
+      return false;
+    }
+    elt.style.borderRadius = this.radii;
+    return true;
+  }
+  eq(other) {
+    return this.radii === other.radii && this.base.eq(other.base);
+  }
+}
+
+// Selection layer drawing the same per-line rects as CodeMirror's
+// `drawSelection` (whose rects the stylesheet hides), but with the selection
+// shape's convex corners rounded: the first and last characters of the first
+// and last lines, and -- where consecutive lines start or end at different
+// columns -- the corners of the step between them. Concave corners (where a
+// neighbouring line's rect overhangs) stay square, as CSS cannot round inward.
+function selectionLayerRounded() {
+  return layer({
+    above: false,
+    class: "cm-dxcm-selectionLayer",
+    update: (update) =>
+      update.docChanged ||
+      update.selectionSet ||
+      update.viewportChanged ||
+      update.geometryChanged,
+    markers: (view) => {
+      const markers = [];
+      for (const range of view.state.selection.ranges) {
+        if (!range.empty) {
+          markers.push(...RectangleMarker.forRange(view, "cm-selectionBackground", range));
+        }
+      }
+      return selectionMarkersRound(markers);
+    },
+  });
+}
+
+// Wraps each selection `RectangleMarker` in a `RoundedRectMarker` whose
+// corners are rounded only where the selection shape is convex. A corner is
+// convex when no vertically adjacent rect covers the corner's x position and
+// no rect on the same row touches that edge (rects from all selection ranges
+// are considered together, so touching selections stay seamless).
+function selectionMarkersRound(markers) {
+  const eps = 1.5;
+  // `width === null` means the rect extends to the editor's right edge.
+  const rects = markers.map((marker) => ({
+    left: marker.left,
+    right: marker.width === null ? Number.MAX_SAFE_INTEGER : marker.left + marker.width,
+    top: marker.top,
+    bottom: marker.top + marker.height,
+  }));
+  const cornerCovered = (others, x) =>
+    others.some((other) => other.left - eps <= x && x <= other.right + eps);
+  return markers.map((marker, index) => {
+    const rect = rects[index];
+    const above = rects.filter(
+      (other) => other !== rect && Math.abs(other.bottom - rect.top) < eps,
+    );
+    const below = rects.filter(
+      (other) => other !== rect && Math.abs(other.top - rect.bottom) < eps,
+    );
+    const row = rects.filter((other) => other !== rect && Math.abs(other.top - rect.top) < eps);
+    const leftTouched = row.some((other) => Math.abs(other.right - rect.left) < eps);
+    const rightTouched = row.some((other) => Math.abs(other.left - rect.right) < eps);
+    const corners = [
+      !cornerCovered(above, rect.left) && !leftTouched, // top-left
+      !cornerCovered(above, rect.right) && !rightTouched, // top-right
+      !cornerCovered(below, rect.right) && !rightTouched, // bottom-right
+      !cornerCovered(below, rect.left) && !leftTouched, // bottom-left
+    ];
+    const radii = corners
+      .map((rounded) => (rounded ? SELECTION_RECT_RADIUS : "0"))
+      .join(" ");
+    return new RoundedRectMarker(marker, radii);
+  });
+}
+
 // The currently open code-action menu's teardown handle, or `null`. Only one
 // menu is open at a time (per page); opening a new one closes the previous.
 let codeActionMenuActive = null;
@@ -1121,15 +1261,18 @@ const {
   EditorSelection,
   Annotation,
   Prec,
+  RangeSet,
   lineNumbers,
-  highlightActiveLineGutter,
-  highlightActiveLine,
   highlightWhitespace,
   rectangularSelection,
   crosshairCursor,
   keymap,
   Decoration,
   ViewPlugin,
+  layer,
+  RectangleMarker,
+  GutterMarker,
+  gutterLineClass,
   HighlightStyle,
   syntaxHighlighting,
   bracketMatching,
@@ -1188,10 +1331,15 @@ const extensions = [
       { key: "Ctrl-ArrowDown", run: (view) => scrollByLine(view, true) },
     ]),
   ),
+  // Selection rects with rounded convex corners, replacing the look of
+  // `minimalSetup`'s `drawSelection` layer (whose rects the stylesheet makes
+  // transparent; the layer itself stays, as it also hides the native
+  // selection).
+  selectionLayerRounded(),
 ];
 
 if (config.line_numbers) {
-  extensions.push(lineNumbers(), highlightActiveLineGutter());
+  extensions.push(lineNumbers(), activeLineGutterMainHighlighter());
 }
 
 // === Optional editor features === //
@@ -1214,7 +1362,7 @@ if (config.allow_multiple_selections) {
   );
 }
 if (config.highlight_active_line) {
-  extensions.push(highlightActiveLine());
+  extensions.push(activeLineMainHighlighter());
 }
 if (config.highlight_selection_matches) {
   // Highlight all occurrences of the selected text, the selection included

@@ -8,6 +8,8 @@
 * `Ctrl + Shift + ]` with a selection unfolds all folds inside it, leaving each unfolded range selected. ([#5][#5])
 * `Ctrl + Shift + [` with a selection folds exactly the selected characters. ([#5][#5])
 * Folding selects the folded range(s), so `Ctrl + Shift + [` / `Ctrl + Shift + ]` toggle between contracting and expanding them. ([#5][#5])
+* With multiple selections, only the main selection's line gets the active line (and gutter) highlight. ([#5][#5])
+* Selection rects are drawn with rounded corners where the selection shape is convex. ([#5][#5])
 
 [#5]: https://github.com/azriel91/dioxus_codemirror/pull/5
 
