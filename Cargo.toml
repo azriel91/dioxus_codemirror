@@ -19,11 +19,11 @@ members = [
 
 [workspace.dependencies]
 # dioxus_codemirror crates
-dioxus_codemirror = { path = "dioxus_codemirror", version = "0.3.1" }
+dioxus_codemirror = { path = "dioxus_codemirror", default-features = false, version = "0.3.1" }
 
 # external crates
-dioxus = "0.7"
-futures = "0.3"
+dioxus = "0.8.0-alpha.1"
+futures = "0.3.34"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 

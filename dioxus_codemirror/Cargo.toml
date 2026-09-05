@@ -43,10 +43,7 @@ lang-all = [
 ]
 
 [dependencies]
-# Not inherited from the workspace: this crate needs `default-features = false`,
-# which a workspace dependency cannot override. The `example` crate uses the
-# workspace `dioxus` (with default features) plus the `web` platform feature.
-dioxus = { version = "0.7", default-features = false, features = [
+dioxus = { workspace = true, features = [
     "macro",
     "html",
     "signals",
