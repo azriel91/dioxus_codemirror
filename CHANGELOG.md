@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## unreleased
+
+* Update dioxus to `0.8.0-alpha1`. ([#6][#6])
+
+[#6]: https://github.com/azriel91/dioxus_codemirror/pull/6
+
+
+## 0.3.1 (2026-06-10)
 
 * `Ctrl + Up` / `Ctrl + Down` scrolls the view by one line without moving the caret. ([#5][#5])
 * `Left` / `Right` (and `Shift` variants) at a fold boundary jump across the fold instead of expanding it. ([#5][#5])
