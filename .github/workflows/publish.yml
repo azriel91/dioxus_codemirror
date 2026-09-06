@@ -14,13 +14,13 @@ jobs:
       issues: write
       checks: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: "Generate Cargo.lock"
         run: cargo generate-lockfile
 
       - name: cargo-audit cache restore
         id: cargo-audit_cache_restore
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/bin/cargo-audit
           key: ${{ runner.os }}-cargo-audit
@@ -30,7 +30,7 @@ jobs:
 
       - name: cargo-audit cache save
         id: cargo-audit_cache_save
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         if: always() && steps.cargo-audit_cache_restore.outputs.cache-hit != 'true'
         with:
           path: ~/.cargo/bin/cargo-audit
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
 
       # Needed by dioxus
@@ -69,7 +69,7 @@ jobs:
       - name: Prepare symlink configuration
         run: git config --global core.symlinks true
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: taiki-e/install-action@nextest
@@ -86,12 +86,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
 
       - name: cargo-release cache restore
         id: cargo_release_cache_restore
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/bin/cargo-release
           key: ${{ runner.os }}-cargo-release
@@ -101,7 +101,7 @@ jobs:
 
       - name: cargo-release cache save
         id: cargo_release_cache_save
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         if: always() && steps.cargo_release_cache_restore.outputs.cache-hit != 'true'
         with:
           path: ~/.cargo/bin/cargo-release

@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: "Install Rust"
         uses: dtolnay/rust-toolchain@master
@@ -39,7 +39,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@main
@@ -58,7 +58,7 @@ jobs:
         run: dx bundle --web --release --debug-symbols=false -p example
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           # Upload the bundled site
           path: "target/dx/example/release/web/public"
