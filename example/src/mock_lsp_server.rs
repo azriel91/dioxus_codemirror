@@ -20,7 +20,8 @@ impl LspServer for MockLspServer {
         let request: Value = serde_json::from_str(message.json()).unwrap_or(Value::Null);
         let method = request.get("method").and_then(Value::as_str);
 
-        // Only requests (which carry an `id`) get a response; notifications do not.
+        // Only requests (which carry an `id`) get a response; notifications do
+        // not.
         let Some(id) = request.get("id").filter(|id| !id.is_null()).cloned() else {
             return Vec::new();
         };

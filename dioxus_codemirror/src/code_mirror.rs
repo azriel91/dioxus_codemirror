@@ -242,8 +242,9 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
                         value.set(doc);
                     }
                     Ok(Evt::LspMessageRecv { json }) => {
-                        // Hand the message to the server and forward its replies
-                        // straight back to the editor's LSP client.
+                        // Hand the message to the server and forward its
+                        // replies straight back to the
+                        // editor's LSP client.
                         if let Some(lsp) = lsp.as_ref() {
                             let replies = lsp.on_message_to_server.call(LspMessage::new(json));
                             for reply in replies {
@@ -263,9 +264,10 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
     // === Forward server-pushed LSP messages into the editor === //
     // An async bridge (see `LspBridge::lsp_bridge_from_server_async`) lets the
     // server push replies and unprompted messages -- e.g.
-    // `textDocument/publishDiagnostics` -- at any time. Drain them here and hand
-    // each to the editor's LSP client, the same way prompted replies are. The
-    // synchronous bridge has no receiver, so this loop ends immediately.
+    // `textDocument/publishDiagnostics` -- at any time. Drain them here and
+    // hand each to the editor's LSP client, the same way prompted replies
+    // are. The synchronous bridge has no receiver, so this loop ends
+    // immediately.
     use_future(move || {
         let lsp_push = lsp_push.clone();
         async move {
@@ -278,9 +280,9 @@ pub fn CodeMirror(props: CodeMirrorProps) -> Element {
 
             while let Some(message) = messages_pushed_rx.next().await {
                 // The editor exists by the time the server pushes (pushes are
-                // driven by editor messages, which require a mounted editor); if
-                // it does not yet, the message predates the LSP client and is
-                // dropped.
+                // driven by editor messages, which require a mounted editor);
+                // if it does not yet, the message predates the
+                // LSP client and is dropped.
                 if let Some(evaluator) = eval_handle.peek().as_ref() {
                     let _ = evaluator.send(Cmd::LspMessageSend {
                         json: message.json_into(),

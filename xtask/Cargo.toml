@@ -14,4 +14,4 @@ workspace = true
 
 [dependencies]
 regex = "1"
-ureq = "2"
+ureq = "3"

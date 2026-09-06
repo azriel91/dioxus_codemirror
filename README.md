@@ -169,7 +169,8 @@ protocol, the vendored CodeMirror assets, and how to add a language.
 To run the bundled example:
 
 ```sh
-dx serve --platform web -p example
+# Windows can't hot patch successfully yet, so we specify `--hot-patch false`.
+dx serve --web --hot-patch false -p example
 ```
 
 

@@ -376,6 +376,6 @@ impl CodemirrorVendor {
     }
 
     fn http_get(url: &str) -> Result<String, Box<dyn Error>> {
-        Ok(ureq::get(url).call()?.into_string()?)
+        Ok(ureq::get(url).call()?.into_body().read_to_string()?)
     }
 }
